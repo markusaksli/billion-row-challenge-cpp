@@ -28,7 +28,7 @@ void to_utf8(const wchar_t* buffer, char* outBuffer, int len)
 		NULL);
 }
 
-int main()
+int Main()
 {
 	std::ofstream file;
 	file.open("data/1brc.data", std::ios::out | std::ios::binary);
