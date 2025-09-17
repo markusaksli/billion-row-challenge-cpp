@@ -4,6 +4,8 @@
 #include <sstream>
 #include <windows.h>
 
+#include "base/buf_string.h"
+#include "base/hash_map.h"
 #include "base/simd.h"
 #include "base/type_macros.h"
 
@@ -75,9 +77,15 @@ std::wstring ReadFile(const char* filename)
 	return wss.str();
 }
 
-int Main()
+raddbg_type_view(Vector<?>, array(data, size));
+
+int main()
 {
 	data = ReadFile("data/weather_stations.csv");
+
+	// WStringBuffer strbuf(1 * MB);
+	HashSet<WString> stations(10000);
+	WString stationName;
 
 	while (true)
 	{
@@ -85,10 +93,14 @@ int Main()
 		if (data[pos] == L'#')
 		{
 			SeekToNextLine();
+			continue;
 		}
 		u64 stationNameStart = pos;
+		stationName.data = &data[pos];
 		SeekToChar(L';');
-		u64 len = pos - stationNameStart;
+		stationName.len = pos - stationNameStart;
+		stations.Insert(stationName);
+		SeekToNextLine();
 	}
 
 	return 0;

@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "raddbg_markup.h"
 #include "type_macros.h"
 
 template<typename T>
@@ -22,15 +23,24 @@ struct Vector
 		return Bytes(size);
 	}
 
-	void _init(u64 toReserve)
+	void Init(u64 toReserve)
 	{
-		data = malloc(Bytes((toReserve)));
+		assert(toReserve > 0);
+		data = (T*)malloc(Bytes((toReserve)));
 		reserved = toReserve;
 	}
 
+	void InitZero(u64 toReserve)
+	{
+		Init(toReserve);
+		memset(data, 0, Bytes());
+	}
+
+	Vector() = default;
+
 	explicit Vector(const u64 toReserve)
 	{
-		_init(toReserve);
+		Init(toReserve);
 	}
 
 	~Vector()
@@ -46,7 +56,7 @@ struct Vector
 		assert(reserved > 0);
 		assert(toReserve > reserved);
 
-		data = realloc(data, Bytes(toReserve));
+		data = (T*)realloc(data, Bytes(toReserve));
 		reserved = toReserve;
 	}
 
@@ -114,3 +124,5 @@ struct Vector
 		size = 0;
 	}
 };
+
+raddbg_type_view(Vector< ? >, array(data, size));

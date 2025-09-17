@@ -36,7 +36,9 @@
     <ClCompile Include="src\scrape_stations.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\base\buf_string.h" />
     <ClInclude Include="src\base\hash_map.h" />
+    <ClInclude Include="src\base\raddbg_markup.h" />
     <ClInclude Include="src\base\simd.h" />
     <ClInclude Include="src\base\type_macros.h" />
     <ClInclude Include="src\base\vector.h" />

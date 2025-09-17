@@ -38,5 +38,11 @@
     <ClInclude Include="src\base\hash_map.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\base\buf_string.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\base\raddbg_markup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
