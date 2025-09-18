@@ -88,7 +88,6 @@ struct HashSet
 		assert(initBuckets > 0);
 		items.Init(initItems);
 		buckets.InitZero(initBuckets);
-		memset(buckets.data, 0, buckets.Bytes());
 		buckets.size = buckets.reserved;
 	}
 

@@ -23,6 +23,11 @@ struct Vector
 		return Bytes(size);
 	}
 
+	u64 ReservedBytes() const
+	{
+		return Bytes(reserved);
+	}
+
 	void Init(u64 toReserve)
 	{
 		assert(toReserve > 0);
@@ -33,7 +38,7 @@ struct Vector
 	void InitZero(u64 toReserve)
 	{
 		Init(toReserve);
-		memset(data, 0, Bytes());
+		memset(data, 0, ReservedBytes());
 	}
 
 	Vector() = default;
@@ -125,4 +130,4 @@ struct Vector
 	}
 };
 
-raddbg_type_view(Vector< ? >, array(data, size));
+#define ForVector(vec, iter) for (int iter = 0; i < vec.size; i++)

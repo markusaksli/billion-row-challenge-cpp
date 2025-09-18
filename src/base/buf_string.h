@@ -27,12 +27,14 @@ struct WString
 
 	WString() = default;
 
+	WString(wchar_t* data, u64 len) : data(data), len(len) {}
+
 	u64 Bytes() const
 	{
 		return len * sizeof(wchar_t);
 	}
 
-	void assertNotEmpty() const
+	void AssertNotEmpty() const
 	{
 		assert(data != nullptr);
 		assert(len > 0);
@@ -40,8 +42,8 @@ struct WString
 
 	bool operator==(const WString &other) const
 	{
-		assertNotEmpty();
-		other.assertNotEmpty();
+		AssertNotEmpty();
+		other.AssertNotEmpty();
 		if (len != other.len
 			|| data[0] != other.data[0]
 			|| data[len - 1] != other.data[len - 1])
@@ -51,6 +53,21 @@ struct WString
 
 		return memcmp(data, other.data, Bytes()) == 0;
 	}
+
+	wchar_t& operator[](u64 index)
+	{
+		assert(index > 0 && index < len);
+		AssertNotEmpty();
+		return data[index];
+	}
+
+	void Copy(const WString &other)
+	{
+		AssertNotEmpty();
+		other.AssertNotEmpty();
+		assert(other.len == len);
+		memcpy(data, other.data, Bytes());
+	}
 };
 
 template<>
@@ -58,7 +75,7 @@ struct std::hash<WString>
 {
 	HASH_T operator()(const WString& str) const noexcept
 	{
-		str.assertNotEmpty();
+		str.AssertNotEmpty();
 		return fnv1a(str.data, str.len);
 	}
 };
@@ -88,12 +105,32 @@ struct WStringBuffer
 		return &data[size];
 	}
 
-	void PushWStrCopy(const WString& str)
+	void Grow(u64 toAdd = 1)
 	{
-		assert(str.data != nullptr);
-		assert(str.len > 0);
+		assert(toAdd > 0);
+		assert(size + toAdd < reserved);
+		size += toAdd;
+	}
 
-		memcpy(Back(), str.data, str.len);
-		size += str.len;
+	WString PushUninitWString(u64 len)
+	{
+		assert(len > 0);
+		return {Back(), len};
+	}
+
+	WString PushString(u64 len)
+	{
+		assert(len > 0);
+		WString ret = PushUninitWString(len);
+		Grow(len);
+		return ret;
+	}
+
+	WString PushStringCopy(const WString& str)
+	{
+		str.AssertNotEmpty();
+		WString ret = PushString(str.len);
+		ret.Copy(str);
+		return ret;
 	}
 };

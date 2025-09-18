@@ -9,6 +9,9 @@
 #include "base/simd.h"
 #include "base/type_macros.h"
 
+raddbg_type_view(WString, array(data, len));
+raddbg_type_view(Vector<?>, array(data, size));
+
 void to_utf8(const wchar_t* buffer, char* outBuffer, int len)
 {
 	int nChars = WideCharToMultiByte(
@@ -36,6 +39,7 @@ void to_utf8(const wchar_t* buffer, char* outBuffer, int len)
 u64 pos = 0;
 SIMD_Int simdChunk;
 std::wstring data;
+WStringBuffer strbuf(4 * MB);
 
 void Read()
 {
@@ -77,13 +81,19 @@ std::wstring ReadFile(const char* filename)
 	return wss.str();
 }
 
-raddbg_type_view(Vector<?>, array(data, size));
+WString LowerWStr(const WString& str)
+{
+	WString lowered = strbuf.PushStringCopy(str);
+	for (int i = 0; i < lowered.len; i++)
+	{
+		lowered
+	}
+}
 
 int main()
 {
 	data = ReadFile("data/weather_stations.csv");
 
-	// WStringBuffer strbuf(1 * MB);
 	HashSet<WString> stations(10000);
 	WString stationName;
 
@@ -99,6 +109,7 @@ int main()
 		stationName.data = &data[pos];
 		SeekToChar(L';');
 		stationName.len = pos - stationNameStart;
+
 		stations.Insert(stationName);
 		SeekToNextLine();
 	}
