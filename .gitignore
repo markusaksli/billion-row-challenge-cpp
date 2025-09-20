@@ -427,6 +427,9 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-billion_.fdd7b397/*
+.idea/*
+
+**/x64/*
+billion_.fdd7b397/**/*
 data/only_stations.txt
 data/1brc.data
