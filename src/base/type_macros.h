@@ -15,14 +15,8 @@ constexpr u64 TB = GB * 1024ULL;
 constexpr u64 PAGE_SIZE = 4096;
 constexpr u32 U32_MAX = 4294967294;
 
+constexpr u64 NUM_M = 1000 * 1000;
+constexpr u64 NUM_BN = NUM_M * 1000;
+
 #define HASH_T u64
 
-struct FloatV2
-{
-    float x, y;
-};
-
-struct s16v2
-{
-    s16 x, y;
-};

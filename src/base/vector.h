@@ -6,6 +6,69 @@
 #include "raddbg_markup.h"
 #include "type_macros.h"
 
+constexpr u64 PERMUTE_SEED = 0x5eeda628748fc822;
+
+// https://github.com/camel-cdr/cauldron/blob/main/tools/random/permute/README.md
+// For nice bijective function for sampling a random range of unique elements
+struct Permute64 {
+	u64 mask, len, seed;
+
+	void Init(u64 len, u64 seed)
+	{
+		u64 mask = len - 1;
+		mask |= mask >> 1;
+		mask |= mask >> 2;
+		mask |= mask >> 4;
+		mask |= mask >> 8;
+		mask |= mask >> 16;
+		mask |= mask >> 32;
+		this->mask = mask;
+		this->len = len;
+		this->seed = seed;
+	}
+
+	u64 Permute(u64 idx)
+	{
+		u64 const mask = this->mask;
+		u64 const len = this->len;
+		u64 const seed = this->seed;
+		do {
+			idx ^= seed;
+			/* splittable64 */
+			idx ^= (idx & mask) >> 30; idx *= UINT64_C(0xBF58476D1CE4E5B9);
+			idx ^= (idx & mask) >> 27; idx *= UINT64_C(0x94D049BB133111EB);
+			idx ^= (idx & mask) >> 31;
+			idx *= UINT64_C(0xBF58476D1CE4E5B9);
+
+			idx ^= seed >> 32;
+			idx &= mask;
+			idx *= UINT32_C(0xED5AD4BB);
+
+			idx ^= seed >> 48;
+			///* hash16_xm3 */
+			idx ^= (idx & mask) >> 7; idx *= 0x2993u;
+			idx ^= (idx & mask) >> 5; idx *= 0xE877u;
+			idx ^= (idx & mask) >> 9; idx *= 0x0235u;
+			idx ^= (idx & mask) >> 10;
+
+			/* From Andrew Kensler: "Correlated Multi-Jittered Sampling" */
+			idx ^= seed; idx *= 0xe170893d;
+			idx ^= seed >> 16;
+			idx ^= (idx & mask) >> 4;
+			idx ^= seed >> 8; idx *= 0x0929eb3f;
+			idx ^= seed >> 23;
+			idx ^= (idx & mask) >> 1; idx *= 1 | seed >> 27;
+			idx *= 0x6935fa69;
+			idx ^= (idx & mask) >> 11; idx *= 0x74dcb303;
+			idx ^= (idx & mask) >> 2; idx *= 0x9e501cc3;
+			idx ^= (idx & mask) >> 2; idx *= 0xc860a3df;
+			idx &= mask;
+			idx ^= idx >> 5;
+		} while (idx >= len);
+		return idx;
+	}
+};
+
 template<typename T>
 struct Vector
 {
@@ -31,6 +94,7 @@ struct Vector
 	void Init(u64 toReserve)
 	{
 		assert(toReserve > 0);
+		assert(data == nullptr && reserved == 0 && size == 0);
 		data = (T*)malloc(Bytes((toReserve)));
 		reserved = toReserve;
 	}
@@ -48,17 +112,25 @@ struct Vector
 		Init(toReserve);
 	}
 
+	void AssertNotEmpty()
+	{
+		assert(reserved > 0 && data != nullptr);
+	}
+
 	~Vector()
 	{
 		if (data != nullptr)
 		{
 			free(data);
+			data = nullptr;
+			size = 0;
+			reserved = 0;
 		}
 	}
 
 	void _reserve(const u64 toReserve)
 	{
-		assert(reserved > 0);
+		AssertNotEmpty();
 		assert(toReserve > reserved);
 
 		data = (T*)realloc(data, Bytes(toReserve));
@@ -67,7 +139,7 @@ struct Vector
 
 	void _grow()
 	{
-		assert(reserved > 0);
+		AssertNotEmpty();
 
 		u64 newSize = size + 1;
 		if (newSize > reserved)
@@ -79,7 +151,7 @@ struct Vector
 
 	T& operator[](u64 index)
 	{
-		assert(reserved > 0);
+		AssertNotEmpty();
 		assert(size > 0);
 		assert(index < size);
 		return data[index];
@@ -117,6 +189,12 @@ struct Vector
 		memcpy(Back(), val, sizeof(T));
 	}
 
+	void PushMove(const T&& val)
+	{
+		PushReuse();
+		Last() = std::move(val);
+	}
+
 	void Push(const T& val)
 	{
 		PushReuse();
@@ -125,8 +203,15 @@ struct Vector
 
 	void Clear()
 	{
-		assert(reserved > 0);
+		AssertNotEmpty();
 		size = 0;
+	}
+
+	Permute64 GetPermute() const
+	{
+		Permute64 p;
+		p.Init(size, PERMUTE_SEED + std::time(0));
+		return p;
 	}
 };
 

@@ -71,15 +71,17 @@ constexpr u64 nextPrime(u64 n) {
 static_assert(nextPrime(100) == 101, "computed incorrectly");
 
 template <typename K>
+struct HashSetNode
+{
+    K k;
+    u32 next = 0;
+};
+
+template <typename K>
 struct HashSet
 {
-    struct HashSetNode
-    {
-        K k;
-        u32 next = 0;
-    };
-
-	Vector<HashSetNode> items;
+    typedef HashSetNode<K> NodeType;
+	Vector<NodeType> items;
 	Vector<u32> buckets;
     u32* lastIndexed = nullptr;
 
@@ -96,7 +98,7 @@ struct HashSet
 		Init(initItems, nextPrime(initItems * 10));
 	}
 
-    explicit HashSet<K>(u64 initItems)
+    explicit HashSet(u64 initItems)
 	{
         InitAuto(initItems);
 	}
@@ -121,7 +123,7 @@ struct HashSet
         InsertIndexed(k, lastIndexed);
 	}
 
-    HashSetNode* InsertHashed(const K& k, HASH_T hash)
+    NodeType* InsertHashed(const K& k, HASH_T hash)
 	{
 		u32* itemPtr = buckets.Get(hash % buckets.size);
 		while (true)
@@ -137,12 +139,12 @@ struct HashSet
 		return nullptr;
 	}
 
-    HashSetNode* Insert(const K& k)
+    NodeType* Insert(const K& k)
 	{
 		return InsertHashed(k, std::hash<K>()(k));
 	}
 
-    HashSetNode* FindHashed(const K& k, HASH_T hash)
+    NodeType* FindHashed(const K& k, HASH_T hash)
     {
         u32* itemPtr = buckets.Get(hash % buckets.size);
 
@@ -158,8 +160,104 @@ struct HashSet
         return nullptr;
     }
 
-    HashSetNode* Find(const K& k)
+    NodeType* Find(const K& k)
 	{
         return Find(k, std::hash<K>(k));
 	}
+};
+
+template <typename K, typename V>
+struct HashPairNode
+{
+    K k;
+    V v;
+    u32 next = 0;
+};
+
+template <typename K, typename V>
+struct HashMap
+{
+    typedef HashPairNode<K, V> NodeType;
+    Vector<NodeType> items;
+    Vector<u32> buckets;
+    // u32* lastIndexed = nullptr;
+
+    void Init(u64 initBuckets, u64 initItems)
+    {
+        assert(initBuckets > 0);
+        items.Init(initItems);
+        buckets.InitZero(initBuckets);
+        buckets.size = buckets.reserved;
+    }
+
+    void InitAuto(u64 initItems)
+    {
+        Init(initItems, nextPrime(initItems * 10));
+    }
+
+    explicit HashMap(u64 initItems)
+    {
+        InitAuto(initItems);
+    }
+
+    void InsertIndexed(const K& k, const V& v, u32* itemPtr)
+    {
+        *itemPtr = items.size;
+        items.PushReuse();
+        items.Last().k = k;
+        items.Last().v = v;
+        items.Last().next = 0;
+    }
+
+    // void InsertLastIndexed(const K& k, const V& v)
+    // {
+    //     assert(lastIndexed != nullptr);
+    //     InsertIndexed(k, v, lastIndexed);
+    // }
+
+    NodeType* InsertHashed(const K& k, const V& v, HASH_T hash)
+    {
+        u32* itemPtr = buckets.Get(hash % buckets.size);
+        while (true)
+        {
+            const u32 item = *itemPtr;
+            if (item == 0) break;
+            if (items[item].k == k) return items.Get(item);
+            itemPtr = &items[item].next;
+        }
+
+        InsertIndexed(k, v, itemPtr);
+
+        return nullptr;
+    }
+
+    NodeType* Insert(const K& k, const V& v)
+    {
+        return InsertHashed(k, v, std::hash<K>()(k));
+    }
+
+    NodeType* FindHashed(const K& k, HASH_T hash)
+    {
+        u32* itemPtr = buckets.Get(hash % buckets.size);
+
+        while (true)
+        {
+            const u32 item = *itemPtr;
+            if (item == 0) break;
+            if (items[item].k == k)
+            {
+                // lastIndexed = itemPtr;
+                return items.Get(item);
+            }
+            itemPtr = &items[item].next;
+        }
+
+        // lastIndexed = itemPtr;
+        return nullptr;
+    }
+
+    NodeType* Find(const K& k)
+    {
+        return Find(k, std::hash<K>(k));
+    }
 };

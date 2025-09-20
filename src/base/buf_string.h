@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "hash_map.h"
 #include "type_macros.h"
 
 inline const HASH_T fnv1a(const void* key, const HASH_T len)
@@ -54,6 +55,12 @@ struct WString
 		return memcmp(data, other.data, Bytes()) == 0;
 	}
 
+	operator wchar_t*() const
+	{
+		AssertNotEmpty();
+		return data;
+	}
+
 	wchar_t& operator[](u64 index)
 	{
 		assert(index > 0 && index < len);
@@ -86,7 +93,7 @@ struct WStringBuffer
 	u64 reserved = 0;
 	u64 size = 0;
 
-	void _init(u64 toReserve)
+	void Init(u64 toReserve)
 	{
 		assert(toReserve > 0);
 		data = (wchar_t*)malloc(toReserve * sizeof(wchar_t));
@@ -95,24 +102,65 @@ struct WStringBuffer
 
 	explicit WStringBuffer(u64 toReserve)
 	{
-		_init(toReserve);
+		Init(toReserve);
 	}
 
-	wchar_t* Back()
+	~WStringBuffer()
+	{
+		AssertNotEmpty();
+		if (data != nullptr)
+		{
+			data = nullptr;
+			size = 0;
+			reserved = 0;
+		}
+	}
+
+	void AssertNotEmpty() const
 	{
 		assert(reserved > 0);
+		assert(data != nullptr);
+	}
+
+	operator wchar_t* () const
+	{
+		AssertNotEmpty();
+		return data;
+	}
+
+	wchar_t& Last() const
+	{
+		AssertNotEmpty();
 		assert(size < reserved);
-		return &data[size];
+		return data[size];
+	}
+
+	wchar_t* Back() const
+	{
+		return &Last();
+	}
+
+	u64 Remaining() const
+	{
+		AssertNotEmpty();
+		return reserved - size;
 	}
 
 	void Grow(u64 toAdd = 1)
 	{
+		AssertNotEmpty();
 		assert(toAdd > 0);
 		assert(size + toAdd < reserved);
 		size += toAdd;
 	}
 
-	WString PushUninitWString(u64 len)
+	void Terminate()
+	{
+		Last() = L'\0';
+		Grow();
+	}
+
+	WString PushUninitWString(u64 len) const
 	{
 		assert(len > 0);
 		return {Back(), len};
@@ -132,5 +180,76 @@ struct WStringBuffer
 		WString ret = PushString(str.len);
 		ret.Copy(str);
 		return ret;
+	}
+
+	WString PushLoweredStringCopy(const WString& str)
+	{
+		WString lowered = PushStringCopy(str);
+		Terminate();
+		_wcslwr_s(lowered.data, lowered.Bytes());
+		return lowered;
+	}
+
+	void Push(const WString& str)
+	{
+		PushStringCopy(str);
+	}
+
+	void Push(const wchar_t c)
+	{
+		Last() = c;
+		Grow();
+	}
+
+	void Push(float f, int precision = 1)
+	{
+		// forward to double overload to avoid duplicate code
+		Push(static_cast<double>(f), precision);
+	}
+
+	void Push(double f, int precision = 1)
+	{
+		AssertNotEmpty();
+
+		int written = swprintf(Back(), Remaining(), L"%.*f", precision, f);
+		if (written <= 0) {
+			return;
+		}
+
+		Grow(static_cast<u64>(written));
+	}
+
+	void PushF() {} // base case
+
+	template<class First, class... Rest>
+	void PushF(First const& first, Rest const&... rest)
+	{
+		Push(first);
+		PushF(rest...);
+	}
+
+	void Pop(u64 toPop = 1)
+	{
+		AssertNotEmpty();
+		assert(toPop > 0);
+		assert(toPop <= size);
+		size -= toPop;
+	}
+
+	void Pop(const WString& str)
+	{
+		str.AssertNotEmpty();
+		Pop(str.len);
+	}
+
+	void PopTerminated(const WString& str)
+	{
+		str.AssertNotEmpty();
+		Pop(str.len + 1);
+	}
+
+	void Clear()
+	{
+		size = 0;
 	}
 };
