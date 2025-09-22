@@ -35,11 +35,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\gen.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_GenData|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_Gen|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="src\scrape_stations.cpp" />
+    <ClCompile Include="src\1brc.cpp" />
+    <ClCompile Include="src\gen.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\base\buf_string.h" />
@@ -48,6 +45,7 @@
     <ClInclude Include="src\base\simd.h" />
     <ClInclude Include="src\base\type_macros.h" />
     <ClInclude Include="src\base\vector.h" />
+    <ClInclude Include="src\base\xoroshiro128plus.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

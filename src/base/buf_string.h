@@ -30,6 +30,12 @@ struct WString
 
 	WString(wchar_t* data, u64 len) : data(data), len(len) {}
 
+	WString(const wchar_t* data) : data((wchar_t*)data), len(wcslen(data)) 
+	{
+		assert(data != nullptr);
+		assert(len > 0);
+	}
+
 	u64 Bytes() const
 	{
 		return len * sizeof(wchar_t);
@@ -128,6 +134,12 @@ struct WStringBuffer
 		return data;
 	}
 
+	u64 Bytes() const
+	{
+		AssertNotEmpty();
+		return size * sizeof(wchar_t);
+	}
+
 	wchar_t& Last() const
 	{
 		AssertNotEmpty();
@@ -201,6 +213,12 @@ struct WStringBuffer
 		Grow();
 	}
 
+	void Push(const wchar_t* str)
+	{
+		assert(str != nullptr);
+		PushStringCopy({(wchar_t*)str});
+	}
+
 	void Push(float f, int precision = 1)
 	{
 		// forward to double overload to avoid duplicate code
@@ -253,3 +271,6 @@ struct WStringBuffer
 		size = 0;
 	}
 };
+
+raddbg_type_view(WString, array(data, len));
+raddbg_type_view(WStringBuffer, array(data, size));

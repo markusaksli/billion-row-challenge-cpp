@@ -202,7 +202,8 @@ struct HashMap
 
     void InsertIndexed(const K& k, const V& v, u32* itemPtr)
     {
-        *itemPtr = items.size;
+        assert(items.size < U32_MAX);
+        *itemPtr = items.size;  // NOLINT(clang-diagnostic-shorten-64-to-32)
         items.PushReuse();
         items.Last().k = k;
         items.Last().v = v;

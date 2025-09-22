@@ -216,3 +216,5 @@ struct Vector
 };
 
 #define ForVector(vec, iter) for (int iter = 0; i < vec.size; i++)
+
+raddbg_type_view(Vector<?>, array(data, size));
