@@ -5,57 +5,78 @@
 
 #include "base/buf_string.h"
 #include "base/hash_map.h"
+#include "base/platform_io.h"
 #include "base/simd.h"
 #include "base/type_macros.h"
 #include "base/Xoroshiro128Plus.h"
 
-struct Utf8FileWriter
+std::ofstream OpenUTF8FileWrite(const char* filename)
 {
-	std::ofstream fs;
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> conv; // TODO: This is really slow, should be a way to generate in utf-8 in the first place
-
-	Utf8FileWriter(const char* filename, bool withBom = true)
-	{
-		fs.open(filename, std::ios::binary | std::ios::out);
-		if (withBom && fs) {
-			const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
-			fs.write(reinterpret_cast<const char*>(bom), 3);
-		}
+	std::ofstream fs(filename, std::ios::binary | std::ios::out);
+	if (fs.good()) {
+		const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+		fs.write(reinterpret_cast<const char*>(bom), 3);
 	}
-
-	void Write(const wchar_t* data, size_t len)
-	{
-		if (!fs) return;
-		std::string utf8 = conv.to_bytes(data, data + len);
-		fs.write(utf8.data(), utf8.size());
-	}
-};
+	return fs;
+}
 
 u64 pos = 0;
 SIMD_Int simdChunk;
-std::wstring data;
-WStringBuffer strbuf(4 * MB);
+String data;
+StringBuffer strbuf(4 * MB);
+
+String ReadFile(const char* filename)
+{
+	strbuf.Clear();
+	String str = strbuf.PushUninitString();
+	std::ifstream fs(filename);
+	if (!fs.good())
+	{
+		return str;
+	}
+
+	fs.seekg(0, std::ios::end);
+	size_t size = fs.tellg();
+	assert(size < strbuf.reserved);
+
+	fs.seekg(0);
+	fs.read(strbuf.data, size);
+	strbuf.size = size;
+	if(strbuf.data[0] == (char)0xEF && strbuf.data[1] == (char)0xBB && str.data[2] == (char)0xBF)
+	{
+		strbuf.data = &strbuf[3];
+		strbuf.size -= 3;
+		str.data = strbuf.data;
+	}
+
+	for (int i = 0; i < SIMD_U8Size; i++)
+	{
+		strbuf.Push('\0');
+	}
+
+	str.len = strbuf.size;
+	return str;
+}
 
 void Read()
 {
-	simdChunk = SIMD_LoadUnAlignedU16(reinterpret_cast<SIMD_Int const*>(&data[pos]));
+	simdChunk = SIMD_LoadUnAligned(reinterpret_cast<SIMD_Int const*>(&data[pos]));
 }
 
-void SeekToChar(const wchar_t c)
+void SeekToChar(const char c)
 {
 	while (true)
 	{
 		Read();
-		SIMD_U16Mask mask = SIMD_CmpEqWideChar(simdChunk, c);
+		SIMD_U8Mask mask = SIMD_CmpEqChar(simdChunk, c);
 		if (mask == 0)
 		{
-			pos += SIMD_U16Size;
+			pos += SIMD_U8Size;
 			continue;
 		}
 
-		u32 bitScanMask = mask;
 		u32 scanResult = 0;
-		_BitScanForward(&scanResult, bitScanMask);
+		_BitScanForward(&scanResult, mask);
 		pos += scanResult;
 		break;
 	}
@@ -63,50 +84,30 @@ void SeekToChar(const wchar_t c)
 
 void SeekToNextLine()
 {
-	SeekToChar(L'\n');
+	SeekToChar('\n');
 	pos++;
-}
-
-std::wstring ReadFile(const char* filename)
-{
-	std::wifstream wif(filename);
-	if (!wif.good())
-	{
-		return std::wstring();
-	}
-
-	wif.imbue(std::locale(std::locale(), new std::codecvt_utf8<wchar_t>));
-	std::wstringstream wss;
-	wss << wif.rdbuf();
-	for (int i = 0; i < SIMD_U16Size; i++)
-	{
-		wss << L'\0';
-	}
-	pos = 0;
-	strbuf.Clear();
-	return wss.str();
 }
 
 void ScrapeStations()
 {
 	data = ReadFile("data/weather_stations.csv");
 
-	HashMap<WString, WString> stations(42000);
-	WString lowered;
+	HashMap<String, String> stations(42000);
+	String lowered;
 
 	while (true)
 	{
-		if (pos >= data.length() || data[pos] == '\0') break;
-		if (data[pos] == L'#')
+		if (pos >= data.len || data[pos] == '\0') break;
+		if (data[pos] == '#')
 		{
 			SeekToNextLine();
 			continue;
 		}
 		const u64 stationNameStart = pos;
-		WString stationName;
+		String stationName;
 		stationName.data = &data[pos];
 
-		SeekToChar(L';');
+		SeekToChar(';');
 
 		stationName.len = pos - stationNameStart;
 		if (stationName.Bytes() > 0 && stationName.Bytes() <= 100) // The challenge specified only up to 100 byte names
@@ -120,21 +121,23 @@ void ScrapeStations()
 		SeekToNextLine();
 	}
 
-	WStringBuffer writeBuf(4 * MB);
+	StringBuffer writeBuf(4 * MB);
 
+	assert(stations.items.size == 41343);
 	for (int i = 0; i < stations.items.size; i++)
 	{
 		if (i > 0)
 		{
-			assert(wcscmp(stations.items[i].k, stations.items[i - 1].k) != 0);
-			assert(wcscmp(stations.items[i].v, stations.items[i - 1].v) != 0);
+			assert(stations.items[i].k != stations.items[i - 1].k);
+			assert(stations.items[i].v != stations.items[i - 1].v);
 		}
 
-		writeBuf.PushF(stations.items[i].v, L'\n');
+		writeBuf.PushF(stations.items[i].v, '\n');
 	}
 
-	Utf8FileWriter writer("data/only_stations.txt");
-	writer.Write(writeBuf.data, writeBuf.size);
+	std::ofstream fs = OpenUTF8FileWrite("data/only_stations.txt");
+	writeBuf.WriteToFilestream(fs);
+	fs.close();
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -144,23 +147,31 @@ void ScrapeStations()
 struct GenerateDataJobInfo
 {
 	std::atomic_bool processing, kill{false};
-	WStringBuffer writeBuf;
+	StringBuffer writeBuf;
 	u64 lines = 0;
 	u64 maxLines = 0;
 };
 
-void GenerateLine(WStringBuffer& writeBuf, const WString& station, const double temp)
+// Faster than float conversions
+void Push1DecimalFloat(StringBuffer& writeBuf, const float f)
 {
-	writeBuf.PushF(station, L';', temp, L'\n');
+	s32 scaled = static_cast<s32>(round(f * 10.0f));
+	s32 intPart = scaled / 10;
+	s32 decimal = std::abs(scaled % 10);
+
+	writeBuf.Push(intPart);
+	writeBuf.Push('.');
+	writeBuf.Push(static_cast<char>('0' + decimal));
 }
 
-float GetRandomTemp(Xoroshiro128Plus::Random &rnd)
+void GenerateLine(Xoroshiro128Plus::Random& rnd, StringBuffer& writeBuf, Vector<String>* stations)
 {
-	double u = rnd.NextDouble();
-	return static_cast<float>(u * 199.8 - 99.9);
+	writeBuf.PushF((*stations)[rnd.Next() % 100], ';');
+	Push1DecimalFloat(writeBuf, static_cast<float>(rnd.NextDouble() * 199.8 - 99.9));
+	writeBuf.Push('\n');
 }
 
-void GenerateDataJob(GenerateDataJobInfo* info, Vector<WString>* stations)
+void GenerateDataJob(GenerateDataJobInfo* info, Vector<String>* stations)
 {
 	Xoroshiro128Plus::Random rnd; // Faster random since we don't need perfect distributions
 
@@ -178,7 +189,7 @@ void GenerateDataJob(GenerateDataJobInfo* info, Vector<WString>* stations)
 		{
 			if (info->lines >= info->maxLines) goto endGen;
 			if (info->writeBuf.Remaining() < 100) goto endGen; // A line is probably never longer than this
-			GenerateLine(info->writeBuf, (*stations)[rnd.Next() % 100], GetRandomTemp(rnd));
+			GenerateLine(rnd, info->writeBuf, stations);
 			info->lines++;
 		}
 		
@@ -187,13 +198,13 @@ void GenerateDataJob(GenerateDataJobInfo* info, Vector<WString>* stations)
 	}
 }
 
-void GenerateData()
+void GenerateData(double bufferSize)
 {
 	// Not sure why the original challenge didn't do this first
 	// I'm leaving the original input file in here to just use the same input for spiritual reasons
 
 	data = ReadFile("data/only_stations.txt");
-	if (data.empty())
+	if (data.Empty())
 	{
 		ScrapeStations();
 	}
@@ -203,25 +214,27 @@ void GenerateData()
 	data = ReadFile("data/only_stations.txt");
 
 	//TODO: Arena arrays not vectors
-	Vector<WString> allStations(42000);
+	Vector<String> allStations(42000);
 	while (true)
 	{
-		if (pos >= data.length() || data[pos] == '\0') break;
+		if (pos >= data.len || data[pos] == '\0') break;
 		const u64 stationNameStart = pos;
-		WString stationName;
+		String stationName;
 		stationName.data = &data[pos];
 
-		SeekToChar(L'\n');
+		SeekToChar('\n');
 
-		stationName.len = pos - stationNameStart - 1;
+		stationName.len = pos - stationNameStart;
 		allStations.Push(stationName);
 		pos++;
 	}
+	assert(allStations.size == 41343);
+	assert(allStations[0] == String("Tokyo"));
 
 	// Get a random selection and create a compact representation
 
 	u32 numStationsToUse = 100;
-	Vector<WString> stations(numStationsToUse);
+	Vector<String> stations(numStationsToUse);
 
 	Permute64 p = allStations.GetPermute();
 	for (u64 i = 0; i < numStationsToUse; i++)
@@ -229,7 +242,7 @@ void GenerateData()
 		stations.Push(allStations[p.Permute(i)]);
 		if (i > 0)
 		{
-			assert(wcscmp(stations[i], stations[i - 1]) != 0);
+			assert(stations[i] != stations[i - 1]);
 		}
 	}
 
@@ -237,29 +250,45 @@ void GenerateData()
 
 	// Give each thread some memory to fill and iterate until we have some small number of lines left to fill
 
-	constexpr u64 totalLines = 1 * NUM_BN; // CBA counting the zeros myself
-	constexpr u64 totalMemory = 16 * GB;
+	constexpr u64 totalLines = NUM_BN; // CBA counting the zeros myself
+	const u64 totalMemory = static_cast<u64>(round(bufferSize * GB));
 
 	const u32 numWorkers = std::thread::hardware_concurrency() - 2; // Leave physical core(s) for kernel and I/O to be nice
-	// const u32 numWorkers = 1;
 	const u64 workerMemory = totalMemory / numWorkers;
-	const u64 workerWChars = workerMemory / sizeof(wchar_t);
+	const u64 workerChars = workerMemory / sizeof(char);
 
 	Vector<GenerateDataJobInfo> jobs;
 	jobs.InitZero(numWorkers);
 	jobs.size = jobs.reserved;
 	Vector<std::thread*> threads(numWorkers);
 
-	WStringBuffer writeBuf(totalMemory / sizeof(wchar_t));
+	StringBuffer writeBuf(totalMemory / sizeof(char));
 
 	for (u64 i = 0; i < numWorkers; i++)
 	{
-		jobs[i].writeBuf.data = &writeBuf.data[i * workerWChars];
-		jobs[i].writeBuf.reserved = workerWChars;
+		jobs[i].writeBuf.data = &writeBuf.data[i * workerChars];
+		jobs[i].writeBuf.reserved = workerChars;
 		threads.Push(new std::thread(GenerateDataJob, &jobs[i], &stations));
 	}
 
-	Utf8FileWriter writer("data/1brc.data");
+	FileHandle fh;
+#ifndef _WIN32
+	fh.fd = ::open("data/1brc.data", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+#else
+	fh.handle = ::CreateFileA("data/1brc.data",
+		GENERIC_WRITE,
+		0,
+		NULL,
+		CREATE_ALWAYS,
+		FILE_FLAG_NO_BUFFERING,
+		NULL);
+#endif
+
+	const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+	WriteSingle(fh, bom, 3);
+
+	Array<WriteData> writeSegments;
+	writeSegments.InitMalloc(numWorkers);
 
 	u64 linesRemaining = totalLines;
 	while(linesRemaining > 10000) // We can leave the remainder for the main thread
@@ -296,15 +325,14 @@ void GenerateData()
 		ForVector(jobs, i)
 		{
 			totalToWrite += jobs[i].writeBuf.Bytes();
+			writeSegments[i].data = jobs[i].writeBuf.data;
+			writeSegments[i].bytes = jobs[i].writeBuf.Bytes();
+			linesRemaining -= jobs[i].lines;
 		}
 		system("cls");
 		printf("%.1f%% generated, writing %.2f GB:", 100.0 - ((double)(linesRemaining) / totalLines) * 100, (double)(totalToWrite) / GB);
 
-		ForVector(jobs, i)
-		{
-			writer.Write(jobs[i].writeBuf.data, jobs[i].writeBuf.size);
-			linesRemaining -= jobs[i].lines;
-		}
+		WriteAll(fh, writeSegments);
 	}
 
 	ForVector(jobs, i)
@@ -322,15 +350,35 @@ void GenerateData()
 
 	for (u64 i = linesRemaining; i > 0; i--)
 	{
-		GenerateLine(writeBuf, stations[rnd.Next() % 100], GetRandomTemp(rnd));
+		GenerateLine(rnd, writeBuf, &stations);
 	}
 
-	writer.Write(writeBuf.data, writeBuf.size);
+	AppendSingle(fh, writeBuf.data, writeBuf.Bytes());
+	fh.Close();
 	printf("\r100.0%% generated");
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-	GenerateData();
+	double bufferSize;
+	if (argc <= 1)
+	{
+		bufferSize = 4.0;
+	}
+	else
+	{
+		if (_stricmp(argv[1], "-buffersize") != 0)
+		{
+			printf("unknown parameter %s", argv[1]);
+			return 1;
+		}
+		if (argc < 3)
+		{
+			printf("missing buffer size value");
+			return 1;
+		}
+		bufferSize = strtod(argv[2], nullptr);
+	}
+	GenerateData(bufferSize);
 	return 0;
 }

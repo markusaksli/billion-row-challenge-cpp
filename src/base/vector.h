@@ -105,6 +105,12 @@ struct Vector
 		memset(data, 0, ReservedBytes());
 	}
 
+	void InitZeroFull(u64 size)
+	{
+		InitZero(size);
+		this->size = size;
+	}
+
 	Vector() = default;
 
 	explicit Vector(const u64 toReserve)
@@ -212,6 +218,63 @@ struct Vector
 		Permute64 p;
 		p.Init(size, PERMUTE_SEED + std::time(0));
 		return p;
+	}
+};
+
+template<typename T>
+struct Array
+{
+	T* data = nullptr;
+	u64 size = 0;
+
+	void AssertNotEmpty()
+	{
+		assert(size > 0 && data != nullptr);
+	}
+
+	static u64 Bytes(const u64 num)
+	{
+		return num * sizeof(T);
+	}
+
+	u64 Bytes() const
+	{
+		return Bytes(size);
+	}
+
+	void Zero()
+	{
+		AssertNotEmpty();
+		memset(data, 0, Bytes());
+	}
+
+	void InitMalloc(u64 size)
+	{
+		assert(data == nullptr);
+		data = (T*)malloc(Bytes(size));
+		this->size = size;
+	}
+
+	void InitMallocZero(u64 size)
+	{
+		InitMalloc(size);
+		Zero();
+	}
+
+	void Free()
+	{
+		if (data != nullptr)
+		{
+			free(data);
+			size = 0;
+		}
+	}
+
+	T& operator[](u64 index)
+	{
+		AssertNotEmpty();
+		assert(index < size);
+		return data[index];
 	}
 };
 
