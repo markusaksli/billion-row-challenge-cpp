@@ -556,6 +556,17 @@ struct StringBuffer
 		PushF(rest...);
 	}
 
+	template<class... Args>
+	String PushStringF(Args const&... args)
+	{
+		u64 start = size;
+		String str = PushUninitString();
+		PushF(args...);
+		str.len = size - start;
+		Terminate();
+		return str;
+	}
+
 	void Pop(u64 toPop = 1)
 	{
 		AssertNotEmpty();

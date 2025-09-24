@@ -138,11 +138,23 @@ int main(int argc, char* argv[])
 	u64 totalLines = NUM_BN;
 	u32 numStationsToUse = 100;
 	double bufferSize = 4.0;
+	String inputDir = "../data/";
+	String outputPath = "../data/1brc.txt";
 
 	if (argc > 1)
 	{
 		for (int i = 1; i < argc; i++)
 		{
+			if (_stricmp(argv[i], "-help") == 0 || _stricmp(argv[i], "-h") == 0)
+			{
+				printf("-inputdir [dir (default ../data/)]\t\tPath to a directory that contains weather_stations.csv\n");
+				printf("-output [file (default ../data/1brc.txt)]\tPath to the output file\n");
+				printf("-stations [int (default 100)]\t\t\tNumber of station names to use (up to 41343)\n");
+				printf("-lines [int (default 1000000000)]\t\tNumber of lines to generate\n");
+				printf("-buffersize [double (default 4.0)]\t\tThe size of the generation buffer in GB\n");
+				return 0;
+			}
+
 			if (_stricmp(argv[i], "-buffersize") == 0)
 			{
 				i++;
@@ -173,6 +185,28 @@ int main(int argc, char* argv[])
 				}
 				totalLines = strtoll(argv[i], nullptr, 10);
 			}
+			else if (_stricmp(argv[i], "-inputdir") == 0)
+			{
+				i++;
+				if (i >= argc)
+				{
+					printf("missing inputdir arg value");
+					return 1;
+				}
+				inputDir.data = argv[i];
+				inputDir.len = strlen(argv[i]);
+			}
+			else if (_stricmp(argv[i], "-output") == 0)
+			{
+				i++;
+				if (i >= argc)
+				{
+					printf("missing output arg value");
+					return 1;
+				}
+				outputPath.data = argv[i];
+				outputPath.len = strlen(argv[i]);
+			}
 			else
 			{
 				printf("unknown parameter %s", argv[i]);
@@ -184,10 +218,11 @@ int main(int argc, char* argv[])
 	// Not sure why the original challenge didn't scrape the unique station names first
 	// I'm leaving the original input file in here to just use the same input for spiritual reasons
 
-	data = ReadFile("../data/only_stations.txt");
+	String stationFilePath = strbuf.PushStringF(inputDir, "only_stations.txt");
+	data = ReadFile(stationFilePath);
 	if (data.Empty())
 	{
-		data = ReadFile("../data/weather_stations.csv");
+		data = ReadFile(strbuf.PushStringF(inputDir, "weather_stations.csv"));
 		if (data.Empty()) return 1;
 
 		HashMap<String, String> stations(42000);
@@ -233,14 +268,14 @@ int main(int argc, char* argv[])
 			writeBuf.PushF(stations.items[i].v, '\n');
 		}
 
-		FileHandle fh = OpenUTF8FileWrite("../data/only_stations.txt");
+		FileHandle fh = OpenUTF8FileWrite(stationFilePath);
 		if (!fh.Append(writeBuf))
 		{
 			return 1;
 		}
 		fh.Close();
 
-		data = ReadFile("../data/only_stations.txt");
+		data = ReadFile(stationFilePath);
 	}
 	if (data.Empty()) return 1;
 
@@ -308,7 +343,7 @@ int main(int argc, char* argv[])
 		threads.Push(new std::thread(GenerateDataJob, &jobs[i], &stations));
 	}
 
-	FileHandle fh = OpenUTF8FileWrite("../data/1brc.data");
+	FileHandle fh = OpenUTF8FileWrite(outputPath);
 	if (!fh.Good()) return 1;
 
 	u64 linesRemaining = totalLines;
@@ -386,7 +421,7 @@ int main(int argc, char* argv[])
 
 	fh.Close();
 	system("cls");
-	printf("finished");
+	printf("Generated %lld lines using %ld stations in %s", totalLines, numStationsToUse, (const char*)outputPath);
 
 	return 0;
 }
