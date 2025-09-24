@@ -143,6 +143,10 @@
     <IntDir>$(ShortProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>gen</TargetName>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_Gen|x64'">
+    <OutDir>$(SolutionDir)\bin\</OutDir>
+    <TargetName>gen</TargetName>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>

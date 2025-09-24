@@ -12,11 +12,12 @@ constexpr u64 KB = 1024ULL;
 constexpr u64 MB = KB * 1024ULL;
 constexpr u64 GB = MB * 1024ULL;
 constexpr u64 TB = GB * 1024ULL;
-constexpr u64 PAGE_SIZE = 4096;
+constexpr u32 PAGE_SIZE = 4 * KB;
 constexpr u32 U32_MAX = 4294967294;
 
 constexpr u64 NUM_M = 1000 * 1000;
 constexpr u64 NUM_BN = NUM_M * 1000;
+
 
 #define HASH_T u64
 

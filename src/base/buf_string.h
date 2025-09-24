@@ -418,6 +418,8 @@ struct StringBuffer
 		Init(toReserve);
 	}
 
+	StringBuffer(){}
+
 	~StringBuffer()
 	{
 		AssertNotEmpty();
@@ -577,13 +579,6 @@ struct StringBuffer
 	void Clear()
 	{
 		size = 0;
-	}
-
-	void WriteToFilestream(std::ofstream &fs) const
-	{
-		AssertNotEmpty();
-		assert(size > 0);
-		fs.write(data, Bytes());
 	}
 };
 
