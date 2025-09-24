@@ -1,14 +1,5 @@
 // raddbg 0.9.21 project file
 
-recent_file: path: "src/gen.cpp"
-recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcstartup/src/startup/exe_common.inl"
-recent_file: path: "src/base/buf_string.h"
-recent_file: path: "src/scrape_stations.cpp"
-recent_file: path: "src/base/hash_map.h"
-recent_file: path: "src/base/vector.h"
-recent_file: path: "src/base/simd.h"
-recent_file: path: "../../../Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.44.35207/include/xstring"
-recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcstartup/src/misc/debugger_jmc.c"
 target:
 {
   executable: "x64/Debug_GenData/gen.exe"
