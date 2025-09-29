@@ -79,6 +79,12 @@ void SeekToNextLine()
 	pos++;
 }
 
+struct StationData
+{
+	String name;
+	double min, max;
+};
+
 struct GenerateDataJobInfo
 {
 	std::atomic_bool processing, kill{false};
@@ -99,14 +105,15 @@ void Push1DecimalFloat(StringBuffer& writeBuf, const float f)
 	writeBuf.Push(static_cast<char>('0' + decimal));
 }
 
-void GenerateLine(Xoroshiro128Plus::Random& rnd, StringBuffer& writeBuf, Vector<String>* stations)
+void GenerateLine(Xoroshiro128Plus::Random& rnd, StringBuffer& writeBuf, Vector<StationData>* stations)
 {
-	writeBuf.PushF((*stations)[rnd.Next() % 100], ';');
-	Push1DecimalFloat(writeBuf, static_cast<float>(rnd.NextDouble() * 199.8 - 99.9));
+	const StationData& stationData = (*stations)[rnd.Next() % stations->size];
+	writeBuf.PushF(stationData.name, ';');
+	Push1DecimalFloat(writeBuf, static_cast<float>(rnd.NextDouble(stationData.min, stationData.max)));
 	writeBuf.Push('\n');
 }
 
-void GenerateDataJob(GenerateDataJobInfo* info, Vector<String>* stations)
+void GenerateDataJob(GenerateDataJobInfo* info, Vector<StationData>* stations)
 {
 	Xoroshiro128Plus::Random rnd; // Faster random since we don't need perfect distributions
 
@@ -302,15 +309,23 @@ int main(int argc, char* argv[])
 
 	// Get a random selection and create a compact representation
 
-	Vector<String> stations(numStationsToUse);
+	Xoroshiro128Plus::Random rnd;
+	Vector<StationData> stations(numStationsToUse);
 
 	Permute64 p = allStations.GetPermute();
 	for (u64 i = 0; i < numStationsToUse; i++)
 	{
-		stations.Push(allStations[p.Permute(i)]);
+		StationData &stationData = stations.PushReuse();
+		stationData.name = allStations[p.Permute(i)];
+		stationData.min = rnd.NextDouble(-99.9, 99.9);
+		stationData.max = rnd.NextDouble(-99.9, 99.9);
+		if (stationData.max < stationData.min)
+		{
+			std::swap(stationData.min, stationData.max);
+		}
 		if (i > 0)
 		{
-			assert(stations[i] != stations[i - 1]);
+			assert(stations[i].name != stations[i - 1].name);
 		}
 	}
 
@@ -406,8 +421,6 @@ int main(int argc, char* argv[])
 	}
 
 	// Fill the remainder on the main thread and we're done
-
-	Xoroshiro128Plus::Random rnd;
 
 	for (u64 i = linesRemaining; i > 0; i--)
 	{

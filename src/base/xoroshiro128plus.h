@@ -133,5 +133,11 @@ namespace Xoroshiro128Plus
 			// Use the top 53 bits for double precision in [0,1)
 			return (Next() >> 11) * (1.0 / (UINT64_C(1) << 53));
 		}
+
+		double NextDouble(double min, double max)
+		{
+			assert(min < max);
+			return min + NextDouble() * (max - min);
+		}
 	};
 }

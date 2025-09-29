@@ -18,7 +18,7 @@
     <ClCompile Include="src\gen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\1brc.cpp">
+    <ClCompile Include="naive.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

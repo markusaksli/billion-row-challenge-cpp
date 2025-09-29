@@ -178,9 +178,10 @@ struct Vector
 		return &Last();
 	}
 
-	void PushReuse()
+	T& PushReuse()
 	{
 		_grow();
+		return operator[](size - 1);
 	}
 
 	void PushZero()
