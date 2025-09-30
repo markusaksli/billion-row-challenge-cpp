@@ -1,9 +1,0 @@
-// raddbg 0.9.21 project file
-
-target:
-{
-  executable: "x64/Debug_GenData/gen.exe"
-  working_directory: ""
-  enabled: 1
-  arguments: "-buffersize 0.0001"
-}

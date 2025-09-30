@@ -1,0 +1,1 @@
+gen_data -lines 1000000 -stations 10

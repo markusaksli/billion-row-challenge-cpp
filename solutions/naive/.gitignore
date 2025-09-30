@@ -430,6 +430,3 @@ FodyWeavers.xsd
 .idea/*
 **/x64/*
 [Tt]emp/
-data/
-!data/weather_stations.csv
-billion_row_challenge.raddbg_project

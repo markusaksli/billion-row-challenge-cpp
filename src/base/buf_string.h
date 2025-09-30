@@ -50,6 +50,20 @@ struct String
 		return memcmp(data, other.data, Bytes()) == 0;
 	}
 
+	bool operator<(const String& other) const
+	{
+		AssertNotEmpty();
+		other.AssertNotEmpty();
+
+		const int cmp = strncmp(data, other.data, (len < other.len) ? len : other.len);
+
+		if (cmp < 0) return true;
+		if (cmp > 0) return false;
+
+		// If prefixes are equal, shorter string is "less"
+		return len < other.len;
+	}
+
 	operator char* () const
 	{
 		AssertNotEmpty();

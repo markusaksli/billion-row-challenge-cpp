@@ -13,13 +13,14 @@
 u64 pos = 0;
 SIMD_Int simdChunk;
 String data;
-StringBuffer strbuf(4 * MB);
+StringBuffer strbuf(4 * KB);
+StringBuffer readbuf(4 * MB);
 
 String ReadFile(const char* filename)
 {
-	strbuf.Clear();
+	readbuf.Clear();
 	pos = 0;
-	String str = strbuf.PushUninitString();
+	String str = readbuf.PushUninitString();
 	std::ifstream fs(filename);
 	if (!fs.good())
 	{
@@ -28,24 +29,24 @@ String ReadFile(const char* filename)
 
 	fs.seekg(0, std::ios::end);
 	size_t size = fs.tellg();
-	assert(size < strbuf.reserved);
+	assert(size < readbuf.reserved);
 
 	fs.seekg(0);
-	fs.read(strbuf.data, size);
-	strbuf.size = size;
-	if(strbuf.data[0] == (char)0xEF && strbuf.data[1] == (char)0xBB && str.data[2] == (char)0xBF)
+	fs.read(readbuf.data, size);
+	readbuf.size = size;
+	if(readbuf.data[0] == (char)0xEF && readbuf.data[1] == (char)0xBB && str.data[2] == (char)0xBF)
 	{
-		strbuf.data = &strbuf[3];
-		strbuf.size -= 3;
-		str.data = strbuf.data;
+		readbuf.data = &readbuf[3];
+		readbuf.size -= 3;
+		str.data = readbuf.data;
 	}
 
 	for (int i = 0; i < SIMD_U8Size; i++)
 	{
-		strbuf.Push('\0');
+		readbuf.Push('\0');
 	}
 
-	str.len = strbuf.size;
+	str.len = readbuf.size;
 	return str;
 }
 
@@ -83,6 +84,17 @@ struct StationData
 {
 	String name;
 	double min, max;
+	double rMin, rMax, rSum;
+	u32 count;
+
+	void Merge(const StationData& other)
+	{
+		assert(name == other.name);
+		rMin = std::min(rMin, other.rMin);
+		rMax = std::min(rMax, other.rMax);
+		rSum += other.rSum;
+		count += other.count;
+	}
 };
 
 struct GenerateDataJobInfo
@@ -93,27 +105,34 @@ struct GenerateDataJobInfo
 	u64 maxLines = 0;
 };
 
-// Faster than float conversions
-void Push1DecimalFloat(StringBuffer& writeBuf, const float f)
+// Faster than double conversions
+void Push1DecimalDouble(StringBuffer& writeBuf, const double d)
 {
-	s32 scaled = static_cast<s32>(round(f * 10.0f));
-	s32 intPart = scaled / 10;
-	s32 decimal = std::abs(scaled % 10);
+	s64 scaled = static_cast<s64>(round(d * 10.0f));
+	s64 intPart = scaled / 10;
+	s64 decimal = std::abs(scaled % 10);
 
 	writeBuf.Push(intPart);
 	writeBuf.Push('.');
 	writeBuf.Push(static_cast<char>('0' + decimal));
 }
 
-void GenerateLine(Xoroshiro128Plus::Random& rnd, StringBuffer& writeBuf, Vector<StationData>* stations)
+void GenerateLine(Xoroshiro128Plus::Random& rnd, StringBuffer& writeBuf, Array<StationData>* stations)
 {
-	const StationData& stationData = (*stations)[rnd.Next() % stations->size];
+	StationData& stationData = (*stations)[rnd.Next() % stations->size];
 	writeBuf.PushF(stationData.name, ';');
-	Push1DecimalFloat(writeBuf, static_cast<float>(rnd.NextDouble(stationData.min, stationData.max)));
+	double temp = rnd.NextDouble(stationData.min, stationData.max);
+	Push1DecimalDouble(writeBuf, temp);
+
+	stationData.rMax = std::max(stationData.rMax, temp);
+	stationData.rMin = std::min(stationData.rMin, temp);
+	stationData.rSum += temp;
+	stationData.count++;
+
 	writeBuf.Push('\n');
 }
 
-void GenerateDataJob(GenerateDataJobInfo* info, Vector<StationData>* stations)
+void GenerateDataJob(GenerateDataJobInfo* info, Array<StationData>* stations)
 {
 	Xoroshiro128Plus::Random rnd; // Faster random since we don't need perfect distributions
 
@@ -147,6 +166,7 @@ int main(int argc, char* argv[])
 	double bufferSize = 4.0;
 	String inputDir = "../data/";
 	String outputPath = "../data/1brc.txt";
+	String validationPath = "../data/validation.txt";
 
 	if (argc > 1)
 	{
@@ -156,6 +176,7 @@ int main(int argc, char* argv[])
 			{
 				printf("-inputdir [dir (default ../data/)]\t\tPath to a directory that contains weather_stations.csv\n");
 				printf("-output [file (default ../data/1brc.txt)]\tPath to the output file\n");
+				printf("-validation [file (default ../data/validation.txt)]\tPath to the output validation file\n");
 				printf("-stations [int (default 100)]\t\t\tNumber of station names to use (up to 41343)\n");
 				printf("-lines [int (default 1000000000)]\t\tNumber of lines to generate\n");
 				printf("-buffersize [double (default 4.0)]\t\tThe size of the generation buffer in GB\n");
@@ -214,6 +235,17 @@ int main(int argc, char* argv[])
 				outputPath.data = argv[i];
 				outputPath.len = strlen(argv[i]);
 			}
+			else if (_stricmp(argv[i], "-validation") == 0)
+			{
+				i++;
+				if (i >= argc)
+				{
+					printf("missing validation arg value");
+					return 1;
+				}
+				validationPath.data = argv[i];
+				validationPath.len = strlen(argv[i]);
+			}
 			else
 			{
 				printf("unknown parameter %s", argv[i]);
@@ -252,10 +284,10 @@ int main(int argc, char* argv[])
 			stationName.len = pos - stationNameStart;
 			if (stationName.Bytes() > 0 && stationName.Bytes() <= 100) // The challenge specified only up to 100 byte names (seems like they all are in the file)
 			{
-				lowered = strbuf.PushLoweredStringCopy(stationName);
+				lowered = readbuf.PushLoweredStringCopy(stationName);
 				if (stations.Insert(lowered, stationName) != nullptr)
 				{
-					strbuf.PopTerminated(lowered);
+					readbuf.PopTerminated(lowered);
 				}
 			}
 			SeekToNextLine();
@@ -276,10 +308,7 @@ int main(int argc, char* argv[])
 		}
 
 		FileHandle fh = OpenUTF8FileWrite(stationFilePath);
-		if (!fh.Append(writeBuf))
-		{
-			return 1;
-		}
+		if (!fh.Append(writeBuf)) return 1;
 		fh.Close();
 
 		data = ReadFile(stationFilePath);
@@ -310,31 +339,49 @@ int main(int argc, char* argv[])
 	// Get a random selection and create a compact representation
 
 	Xoroshiro128Plus::Random rnd;
-	Vector<StationData> stations(numStationsToUse);
+	const u32 numWorkers = std::thread::hardware_concurrency() - 2; // Leave physical core(s) for kernel and I/O to be nice
+	Array<Array<StationData>> stations;
+	stations.InitMallocZero(numWorkers);
+
+	for (u64 i = 0; i < numWorkers; i++)
+	{
+		stations[i].InitMalloc(numStationsToUse);
+	}
 
 	Permute64 p = allStations.GetPermute();
 	for (u64 i = 0; i < numStationsToUse; i++)
 	{
-		StationData &stationData = stations.PushReuse();
+		StationData &stationData = stations[0][i];
 		stationData.name = allStations[p.Permute(i)];
+
 		stationData.min = rnd.NextDouble(-99.9, 99.9);
 		stationData.max = rnd.NextDouble(-99.9, 99.9);
 		if (stationData.max < stationData.min)
 		{
 			std::swap(stationData.min, stationData.max);
 		}
+
+		stationData.rMin = DBL_MAX;
+		stationData.rMax = -DBL_MAX;
+		stationData.rSum = 0;
+		stationData.count = 0;
+
 		if (i > 0)
 		{
-			assert(stations[i].name != stations[i - 1].name);
+			assert(stations[0][i].name != stations[0][i - 1].name);
 		}
 	}
 
 	allStations.~Vector();
 
+	for (u64 i = 1; i < numWorkers; i++)
+	{
+		stations[i].Copy(stations[0]); // Give each thread a copy of the station info so we can merge them later to generate the validation file
+	}
+
 	// Give each thread some memory to fill, write the results, iterate until we have some small number of lines left to fill
 
 	u64 totalMemory = static_cast<u64>(round(bufferSize * GB));
-	const u32 numWorkers = std::thread::hardware_concurrency() - 2; // Leave physical core(s) for kernel and I/O to be nice
 
 	// Use page-aligned buffers just in case
 	const u64 workerMemory = ceil((double)(totalMemory / numWorkers) / PAGE_SIZE) * PAGE_SIZE;
@@ -355,7 +402,7 @@ int main(int argc, char* argv[])
 	{
 		jobs[i].writeBuf.data = &writeBuf.data[i * workerMemory];
 		jobs[i].writeBuf.reserved = workerMemory;
-		threads.Push(new std::thread(GenerateDataJob, &jobs[i], &stations));
+		threads.Push(new std::thread(GenerateDataJob, &jobs[i], &stations[i]));
 	}
 
 	FileHandle fh = OpenUTF8FileWrite(outputPath);
@@ -400,7 +447,7 @@ int main(int argc, char* argv[])
 		}
 
 		system("cls");
-		printf("%.1f%% generated, writing %.2f GB:", 100.0 - ((double)(linesRemaining) / totalLines) * 100, (double)(totalToWrite) / GB);
+		printf("%.1f%% generated, writing %.2f GB", 100.0 - ((double)(linesRemaining) / totalLines) * 100, (double)(totalToWrite) / GB);
 
 		ForVector(jobs, i)
 		{
@@ -424,17 +471,69 @@ int main(int argc, char* argv[])
 
 	for (u64 i = linesRemaining; i > 0; i--)
 	{
-		GenerateLine(rnd, writeBuf, &stations);
+		GenerateLine(rnd, writeBuf, &stations[0]);
 	}
 
-	if (!fh.Append(writeBuf.data, writeBuf.Bytes()))
-	{
-		return 1;
-	}
-
+	if (!fh.Append(writeBuf)) return 1;
 	fh.Close();
+
 	system("cls");
-	printf("Generated %lld lines using %ld stations in %s", totalLines, numStationsToUse, (const char*)outputPath);
+	printf("Generated %lld lines using %ld stations in %s\n", totalLines, numStationsToUse, (const char*)outputPath);
+
+	// Create validation file
+
+	for (u64 i = 1; i < numWorkers; i++)
+	{
+		for (u64 j = 0; j < numStationsToUse; j++)
+		{
+			stations[0][j].Merge(stations[i][j]);
+		}
+	}
+
+	Array<u64> sortedStations;
+	sortedStations.InitMalloc(numStationsToUse);
+	ForVector(sortedStations, i)
+	{
+		sortedStations[i] = i;
+	}
+
+	std::sort(sortedStations.data, sortedStations.data + sortedStations.size,
+		[&](const u64 a, const u64 b) {
+			return stations[0][a].name < stations[0][b].name;
+		});
+
+	writeBuf.Clear();
+	writeBuf.Push('{');
+
+	u64 total = 0;
+
+	bool first = true;
+	for (u64 i = 0; i < numStationsToUse; i++)
+	{
+		if (!first)
+		{
+			writeBuf.Push(", ");
+		}
+		const StationData& stationData = stations[0][sortedStations[i]];
+		writeBuf.PushF(stationData.name, '=');
+		Push1DecimalDouble(writeBuf, stationData.rMin);
+		writeBuf.Push('/');
+		Push1DecimalDouble(writeBuf, stationData.rSum / stationData.count);
+		writeBuf.Push('/');
+		Push1DecimalDouble(writeBuf, stationData.rMax);
+		first = false;
+
+		total += stationData.count;
+	}
+	assert(total == totalLines);
+
+	writeBuf.Push('}');
+
+	fh = OpenUTF8FileWrite(validationPath);
+	if (!fh.Append(writeBuf)) return 1;
+	fh.Close();
+
+	printf("Generated validation file in %s", (const char*)validationPath);
 
 	return 0;
 }

@@ -228,7 +228,7 @@ struct Array
 	T* data = nullptr;
 	u64 size = 0;
 
-	void AssertNotEmpty()
+	void AssertNotEmpty() const
 	{
 		assert(size > 0 && data != nullptr);
 	}
@@ -243,7 +243,7 @@ struct Array
 		return Bytes(size);
 	}
 
-	void Zero()
+	void Zero() const
 	{
 		AssertNotEmpty();
 		memset(data, 0, Bytes());
@@ -277,8 +277,17 @@ struct Array
 		assert(index < size);
 		return data[index];
 	}
+
+	void Copy(const Array &other)
+	{
+		AssertNotEmpty();
+		other.AssertNotEmpty();
+		assert(size >= other.size);
+		memcpy(data, other.data, other.Bytes());
+	}
 };
 
 #define ForVector(vec, iter) for (int iter = 0; i < vec.size; i++)
 
 raddbg_type_view(Vector<?>, array(data, size));
+raddbg_type_view(Array<?>, array(data, size));
