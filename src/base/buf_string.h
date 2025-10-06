@@ -70,6 +70,12 @@ struct String
 		return data;
 	}
 
+	std::string ToStdString() const
+	{
+		AssertNotEmpty();
+		return std::string(data, len);
+	}
+
 	char& operator[](u64 index) const
 	{
 		AssertNotEmpty();
@@ -183,7 +189,7 @@ struct StringBuffer
 
 	StringBuffer(){}
 
-	~StringBuffer()
+	void Free()
 	{
 		AssertNotEmpty();
 		if (data != nullptr)

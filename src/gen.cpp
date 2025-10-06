@@ -1,7 +1,7 @@
 #include <codecvt>
 #include <fstream>
+#include <iomanip>
 #include <locale>
-#include <sstream>
 
 #include "base/buf_string.h"
 #include "base/hash_map.h"
@@ -84,15 +84,17 @@ struct StationData
 {
 	String name;
 	double min, max;
-	double rMin, rMax, rSum;
+	double rMin, rMax, rMean;
 	u32 count;
 
 	void Merge(const StationData& other)
 	{
+		if (other.count == 0) return;
 		assert(name == other.name);
+
 		rMin = std::min(rMin, other.rMin);
-		rMax = std::min(rMax, other.rMax);
-		rSum += other.rSum;
+		rMax = std::max(rMax, other.rMax);
+		rMean = (rMean * count + other.rMean * other.count) / (count + other.count);
 		count += other.count;
 	}
 };
@@ -105,31 +107,56 @@ struct GenerateDataJobInfo
 	u64 maxLines = 0;
 };
 
-// Faster than double conversions
-void Push1DecimalDouble(StringBuffer& writeBuf, const double d)
+s64 ScaledRoundTowardPositive1Decimal(const double d)
 {
-	s64 scaled = static_cast<s64>(round(d * 10.0f));
+	return static_cast<s64>(ceil(d * 10));
+}
+
+// Faster than double conversions
+void Push1DecimalDouble(StringBuffer& writeBuf, const s64 scaled)
+{
 	s64 intPart = scaled / 10;
 	s64 decimal = std::abs(scaled % 10);
+
+	if (intPart == 0 && scaled < 0)
+	{
+		writeBuf.Push('-');
+	}
 
 	writeBuf.Push(intPart);
 	writeBuf.Push('.');
 	writeBuf.Push(static_cast<char>('0' + decimal));
 }
 
+void Push1DecimalDouble(StringBuffer& writeBuf, const double d)
+{
+	s64 scaled = ScaledRoundTowardPositive1Decimal(d);
+	Push1DecimalDouble(writeBuf, scaled);
+}
+
 void GenerateLine(Xoroshiro128Plus::Random& rnd, StringBuffer& writeBuf, Array<StationData>* stations)
 {
 	StationData& stationData = (*stations)[rnd.Next() % stations->size];
 	writeBuf.PushF(stationData.name, ';');
+
 	double temp = rnd.NextDouble(stationData.min, stationData.max);
-	Push1DecimalDouble(writeBuf, temp);
+	s64 scaled = ScaledRoundTowardPositive1Decimal(temp);
+
+	Push1DecimalDouble(writeBuf, scaled);
+
+	writeBuf.Push('\n');
+
+	if (std::abs(temp) < 1.0)
+	{
+		printf("");
+	}
+
+	temp = static_cast<double>(scaled) / 10.0;
 
 	stationData.rMax = std::max(stationData.rMax, temp);
 	stationData.rMin = std::min(stationData.rMin, temp);
-	stationData.rSum += temp;
 	stationData.count++;
-
-	writeBuf.Push('\n');
+	stationData.rMean += (temp - stationData.rMean) / stationData.count;
 }
 
 void GenerateDataJob(GenerateDataJobInfo* info, Array<StationData>* stations)
@@ -351,7 +378,7 @@ int main(int argc, char* argv[])
 	Permute64 p = allStations.GetPermute();
 	for (u64 i = 0; i < numStationsToUse; i++)
 	{
-		StationData &stationData = stations[0][i];
+		StationData& stationData = stations[0][i];
 		stationData.name = allStations[p.Permute(i)];
 
 		stationData.min = rnd.NextDouble(-99.9, 99.9);
@@ -363,7 +390,7 @@ int main(int argc, char* argv[])
 
 		stationData.rMin = DBL_MAX;
 		stationData.rMax = -DBL_MAX;
-		stationData.rSum = 0;
+		stationData.rMean = 0;
 		stationData.count = 0;
 
 		if (i > 0)
@@ -518,7 +545,7 @@ int main(int argc, char* argv[])
 		writeBuf.PushF(stationData.name, '=');
 		Push1DecimalDouble(writeBuf, stationData.rMin);
 		writeBuf.Push('/');
-		Push1DecimalDouble(writeBuf, stationData.rSum / stationData.count);
+		Push1DecimalDouble(writeBuf, stationData.rMean);
 		writeBuf.Push('/');
 		Push1DecimalDouble(writeBuf, stationData.rMax);
 		first = false;
@@ -534,6 +561,24 @@ int main(int argc, char* argv[])
 	fh.Close();
 
 	printf("Generated validation file in %s", (const char*)validationPath);
+
+	std::string doubleValFilePath = inputDir.ToStdString() + "validation_validation.txt";
+	std::ofstream fs(doubleValFilePath);
+	constexpr char bom[] = { static_cast<signed char>(0xEF),
+								static_cast<signed char>(0xBB),
+								static_cast<signed char>(0xBF) };
+	fs.write(bom, 3);
+	fs << std::fixed << std::setprecision(15);
+	for (u64 i = 0; i < numStationsToUse; i++)
+	{
+		const StationData& stationData = stations[0][sortedStations[i]];
+		fs.write(stationData.name.data, stationData.name.len);
+		fs << '\n';
+		fs << "Sum: " << stationData.rMean << '\n';
+		fs << "Count: " << stationData.count << '\n';
+		fs << "Mean: " << stationData.rMean / stationData.count << '\n';
+	}
+	fs.close();
 
 	return 0;
 }

@@ -14,10 +14,15 @@
 struct StationData
 {
 	double min = DBL_MAX;
-	double sum = 0;
+	double mean = 0;
 	uint32_t sampleCount = 0;
 	double max = -DBL_MAX;
 };
+
+double RoundTowardPositive1Decimal(const double d)
+{
+	return ceil(d * 10) / 10.0;
+}
 
 int main(int argc, char* argv[])
 {
@@ -36,8 +41,8 @@ int main(int argc, char* argv[])
 		double temp = std::stod(tempStr);
 		data.max = std::max(data.max, temp);
 		data.min = std::min(data.min, temp);
-		data.sum += temp;
 		data.sampleCount++;
+		data.mean += (temp - data.mean) / data.sampleCount;
 	}
 
 #ifdef _WIN32
@@ -54,7 +59,7 @@ int main(int argc, char* argv[])
 		if (!first) std::cout << u8", ";
 		std::cout << kv.first << u8"="
 			<< kv.second.min << u8"/"
-			<< kv.second.sum / kv.second.sampleCount << u8"/"
+			<< RoundTowardPositive1Decimal(kv.second.mean) << u8"/"
 			<< kv.second.max;
 		first = false;
 	}
