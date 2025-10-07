@@ -562,23 +562,5 @@ int main(int argc, char* argv[])
 
 	printf("Generated validation file in %s", (const char*)validationPath);
 
-	std::string doubleValFilePath = inputDir.ToStdString() + "validation_validation.txt";
-	std::ofstream fs(doubleValFilePath);
-	constexpr char bom[] = { static_cast<signed char>(0xEF),
-								static_cast<signed char>(0xBB),
-								static_cast<signed char>(0xBF) };
-	fs.write(bom, 3);
-	fs << std::fixed << std::setprecision(15);
-	for (u64 i = 0; i < numStationsToUse; i++)
-	{
-		const StationData& stationData = stations[0][sortedStations[i]];
-		fs.write(stationData.name.data, stationData.name.len);
-		fs << '\n';
-		fs << "Sum: " << stationData.rMean << '\n';
-		fs << "Count: " << stationData.count << '\n';
-		fs << "Mean: " << stationData.rMean / stationData.count << '\n';
-	}
-	fs.close();
-
 	return 0;
 }
