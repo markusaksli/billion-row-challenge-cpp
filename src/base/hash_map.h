@@ -180,7 +180,7 @@ struct HashMap
     typedef HashPairNode<K, V> NodeType;
     Vector<NodeType> items;
     Vector<u32> buckets;
-    // u32* lastIndexed = nullptr;
+    u32* lastIndexed = nullptr;
 
     void Init(u64 initBuckets, u64 initItems)
     {
@@ -200,29 +200,35 @@ struct HashMap
         InitAuto(initItems);
     }
 
+    static HASH_T HashKey(const K& k)
+    {
+        return std::hash<K>()(k);
+    }
+
     void InsertIndexed(const K& k, const V& v, u32* itemPtr)
     {
         assert(items.size < U32_MAX);
-        *itemPtr = items.size;  // NOLINT(clang-diagnostic-shorten-64-to-32)
+        *itemPtr = items.size + 1;  // NOLINT(clang-diagnostic-shorten-64-to-32)
         items.PushReuse();
         items.Last().k = k;
         items.Last().v = v;
         items.Last().next = 0;
     }
 
-    // void InsertLastIndexed(const K& k, const V& v)
-    // {
-    //     assert(lastIndexed != nullptr);
-    //     InsertIndexed(k, v, lastIndexed);
-    // }
+    void InsertLastIndexed(const K& k, const V& v)
+    {
+        assert(lastIndexed != nullptr);
+        InsertIndexed(k, v, lastIndexed);
+    }
 
     NodeType* InsertHashed(const K& k, const V& v, HASH_T hash)
     {
         u32* itemPtr = buckets.Get(hash % buckets.size);
         while (true)
         {
-            const u32 item = *itemPtr;
+            u32 item = *itemPtr;
             if (item == 0) break;
+            item--;
             if (items[item].k == k) return items.Get(item);
             itemPtr = &items[item].next;
         }
@@ -234,7 +240,7 @@ struct HashMap
 
     NodeType* Insert(const K& k, const V& v)
     {
-        return InsertHashed(k, v, std::hash<K>()(k));
+        return InsertHashed(k, v, HashKey(k));
     }
 
     NodeType* FindHashed(const K& k, HASH_T hash)
@@ -243,22 +249,23 @@ struct HashMap
 
         while (true)
         {
-            const u32 item = *itemPtr;
+            u32 item = *itemPtr;
             if (item == 0) break;
+            item--;
             if (items[item].k == k)
             {
-                // lastIndexed = itemPtr;
+                lastIndexed = itemPtr;
                 return items.Get(item);
             }
             itemPtr = &items[item].next;
         }
 
-        // lastIndexed = itemPtr;
+        lastIndexed = itemPtr;
         return nullptr;
     }
 
     NodeType* Find(const K& k)
     {
-        return Find(k, std::hash<K>(k));
+        return FindHashed(k, HashKey(k));
     }
 };

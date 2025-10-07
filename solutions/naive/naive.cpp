@@ -17,6 +17,14 @@ struct StationData
 	double mean = 0;
 	uint32_t sampleCount = 0;
 	double max = -DBL_MAX;
+
+	void AddMeasurement(double temp)
+	{
+		max = std::max(max, temp);
+		min = std::min(min, temp);
+		sampleCount++;
+		mean += (temp - mean) / sampleCount;
+	}
 };
 
 double RoundTowardPositive1Decimal(const double d)
@@ -37,12 +45,7 @@ int main(int argc, char* argv[])
 		stationName = line.substr(0, splitPos);
 		tempStr = line.substr(splitPos + 1, line.length());
 
-		StationData& data = map[stationName];
-		double temp = std::stod(tempStr);
-		data.max = std::max(data.max, temp);
-		data.min = std::min(data.min, temp);
-		data.sampleCount++;
-		data.mean += (temp - data.mean) / data.sampleCount;
+		map[stationName].AddMeasurement(std::stod(tempStr));
 	}
 
 #ifdef _WIN32

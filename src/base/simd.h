@@ -3,6 +3,7 @@
 
 #define SIMD_Size 256
 #define SIMD_LoadUnAligned(a) _mm256_loadu_si256(a)
+#define SIMD_StoreUnAligned(dst, a) _mm256_storeu_si256(dst, a)
 
 #define SIMD_U16Size SIMD_Size / 16
 #define SIMD_CompU16EqMask(a, b) _mm256_cmpeq_epu16_mask(a, b)

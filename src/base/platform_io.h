@@ -198,3 +198,156 @@ inline FileHandle OpenUTF8FileWrite(const char* filename)
 
 	return fh;
 }
+
+
+struct MappedFileHandle
+{
+#ifdef _WIN32
+	HANDLE fileHandle = INVALID_HANDLE_VALUE;
+	HANDLE mappingHandle = NULL;
+#else
+	int fd = -1;
+#endif
+
+	char* data = nullptr;
+	u64 length = 0;
+
+	bool Good() const
+	{
+		return data != nullptr && length > 0;
+	}
+
+	void Close()
+	{
+		if (data)
+		{
+#ifdef _WIN32
+			UnmapViewOfFile(data);
+#else
+			munmap(data, (size_t)length);
+#endif
+			data = nullptr;
+		}
+
+#ifdef _WIN32
+		if (mappingHandle)
+		{
+			CloseHandle(mappingHandle);
+			mappingHandle = NULL;
+		}
+		if (fileHandle != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(fileHandle);
+			fileHandle = INVALID_HANDLE_VALUE;
+		}
+#else
+		if (fd >= 0)
+		{
+			close(fd);
+			fd = -1;
+		}
+#endif
+		length = 0;
+	}
+
+	// ------------------------------------------------------------------------------------------------
+	// POSIX implementations
+	// ------------------------------------------------------------------------------------------------
+
+#ifndef _WIN32
+
+	bool OpenRead(const char* filename)
+	{
+		Close();
+
+		fd = ::open(filename, O_RDONLY);
+		if (fd < 0) return false;
+
+		struct stat st;
+		if (fstat(fd, &st) != 0)
+		{
+			close(fd);
+			fd = -1;
+			return false;
+		}
+
+		length = (u64)st.st_size;
+		if (length == 0)
+		{
+			// nothing to map
+			close(fd);
+			fd = -1;
+			length = 0;
+			return false;
+		}
+
+		void* ptr = mmap(nullptr, (size_t)length, PROT_READ, MAP_SHARED, fd, 0);
+		if (ptr == MAP_FAILED)
+		{
+			close(fd);
+			fd = -1;
+			length = 0;
+			return false;
+		}
+
+		data = (char*)ptr;
+		return true;
+	}
+
+#endif // !_WIN32
+
+	// ------------------------------------------------------------------------------------------------
+	// Windows implementations
+	// ------------------------------------------------------------------------------------------------
+
+#ifdef _WIN32
+
+	bool OpenRead(const char* filename)
+	{
+		Close();
+
+		fileHandle = ::CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (fileHandle == INVALID_HANDLE_VALUE)
+		{
+			PrintLastWinError("CreateFileA(OpenRead) failed: ");
+			return false;
+		}
+
+		LARGE_INTEGER fileSizeLi;
+		if (!GetFileSizeEx(fileHandle, &fileSizeLi))
+		{
+			PrintLastWinError("GetFileSizeEx failed: ");
+			Close();
+			return false;
+		}
+
+		if (fileSizeLi.QuadPart == 0)
+		{
+			Close();
+			return false;
+		}
+
+		length = (u64)fileSizeLi.QuadPart;
+
+		mappingHandle = ::CreateFileMappingA(fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
+		if (!mappingHandle)
+		{
+			PrintLastWinError("CreateFileMappingA failed: ");
+			Close();
+			return false;
+		}
+
+		void* ptr = ::MapViewOfFile(mappingHandle, FILE_MAP_READ, 0, 0, 0);
+		if (!ptr)
+		{
+			PrintLastWinError("MapViewOfFile failed: ");
+			Close();
+			return false;
+		}
+
+		data = (char*)ptr;
+		return true;
+	}
+
+#endif // _WIN32
+};
