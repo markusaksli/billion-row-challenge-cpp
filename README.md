@@ -58,6 +58,7 @@ My default code for parsing text and using my simple base layer data structures.
 
 ### [markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp)
 An actual attempt at optimizing my default approach.
+
 **Improvements**
 - Using a fixed-size flat power-of-2 hash map with linear probing for even simpler lookups
 - Custom compact key structure for the map so more of them can fit in cache
@@ -66,6 +67,7 @@ An actual attempt at optimizing my default approach.
 
 ### [markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp)
 Multithreaded version of [markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp).
+
 - Partitions the file by dividing the content by the number of threads and seeking to line boundaries
 - Each thread fills its own hash map
 - Simple merge where we loop through each pair in the thread hash map and do a lookup into the main thread's hash map.
