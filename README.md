@@ -1,7 +1,7 @@
 # Billion Row Challenge C++
 I made this for fun to take a shot at the Java 1BRC in C++. I managed to get a 64x speedup compared to the naive solution (from 196 seconds to 3).
 
-Contains performant code to generate data and a couple of solutions.
+Contains much more performant code to generate the input data.
 
 ## Results
 
@@ -38,6 +38,8 @@ The [build_all.bat](https://github.com/markusaksli/billion-row-challenge-cpp/blo
 
 ## Original challenge description
 See [1BRC Rules and limits](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#rules-and-limits).
+
+Worth noting that the actual longest station name in the input data is `Dolores Hidalgo Cuna de la Independencia Nacional` at 49 bytes, even though it's stated it will be < 100 bytes.
 
 ## Included Solutions
 ### [naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp)
