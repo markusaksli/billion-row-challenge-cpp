@@ -1,0 +1,7 @@
+﻿Program,Average_s,Best_s,Worst_s,Cold_s,Runs
+markusaksli_fast_threaded.exe,3.05,3.04,3.06,3.04,5
+markusaksli_default_threaded.exe,4.06,4.06,4.07,4.07,5
+markusaksli_fast.exe,21.49,21.28,22.3,21.29,5
+markusaksli_default.exe,29.99,28.36,33.44,28.36,5
+naive_plus.exe,96.65,95.13,102.62,102.62,5
+naive.exe,195.99,194.37,197.43,194.37,5

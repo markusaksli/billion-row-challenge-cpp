@@ -10,8 +10,8 @@
 #include "base/type_macros.h"
 #include "base/Xoroshiro128Plus.h"
 
-u64 pos = 0;
-SIMD_Int simdChunk;
+char* pos = nullptr;
+char* dataEnd = nullptr;
 String data;
 StringBuffer strbuf(4 * KB);
 StringBuffer readbuf(4 * MB);
@@ -19,7 +19,6 @@ StringBuffer readbuf(4 * MB);
 String ReadFile(const char* filename)
 {
 	readbuf.Clear();
-	pos = 0;
 	String str = readbuf.PushUninitString();
 	std::ifstream fs(filename);
 	if (!fs.good())
@@ -41,42 +40,20 @@ String ReadFile(const char* filename)
 		str.data = readbuf.data;
 	}
 
-	for (int i = 0; i < SIMD_U8Size; i++)
+	for (int i = 0; i < 64; i++)
 	{
 		readbuf.Push('\0');
 	}
 
 	str.len = readbuf.size;
+	pos = str.data;
+	dataEnd = &str.data[str.len];
 	return str;
-}
-
-void Read()
-{
-	simdChunk = SIMD_LoadUnAligned(reinterpret_cast<SIMD_Int const*>(&data[pos]));
-}
-
-void SeekToChar(const char c)
-{
-	while (true)
-	{
-		Read();
-		SIMD_U8Mask mask = SIMD_CmpEqChar(simdChunk, c);
-		if (mask == 0)
-		{
-			pos += SIMD_U8Size;
-			continue;
-		}
-
-		u32 scanResult = 0;
-		_BitScanForward(&scanResult, mask);
-		pos += scanResult;
-		break;
-	}
 }
 
 void SeekToNextLine()
 {
-	SeekToChar('\n');
+	SIMD_SeekToChar(pos, '\n');
 	pos++;
 }
 
@@ -84,7 +61,7 @@ struct StationData
 {
 	String name;
 	double min, max;
-	double rMin, rMax, rMean;
+	double rMin, rMax, rSum;
 	u32 count;
 
 	void Merge(const StationData& other)
@@ -94,7 +71,7 @@ struct StationData
 
 		rMin = std::min(rMin, other.rMin);
 		rMax = std::max(rMax, other.rMax);
-		rMean = (rMean * count + other.rMean * other.count) / (count + other.count);
+		rSum += other.rSum;
 		count += other.count;
 	}
 };
@@ -156,7 +133,7 @@ void GenerateLine(Xoroshiro128Plus::Random& rnd, StringBuffer& writeBuf, Array<S
 	stationData.rMax = std::max(stationData.rMax, temp);
 	stationData.rMin = std::min(stationData.rMin, temp);
 	stationData.count++;
-	stationData.rMean += (temp - stationData.rMean) / stationData.count;
+	stationData.rSum += temp;
 }
 
 void GenerateDataJob(GenerateDataJobInfo* info, Array<StationData>* stations)
@@ -296,19 +273,18 @@ int main(int argc, char* argv[])
 
 		while (true)
 		{
-			if (pos >= data.len || data[pos] == '\0') break;
-			if (data[pos] == '#')
+			if (pos >= dataEnd || *pos == '\0') break;
+			if (*pos == '#')
 			{
 				SeekToNextLine();
 				continue;
 			}
-			const u64 stationNameStart = pos;
 			String stationName;
-			stationName.data = &data[pos];
+			stationName.data = pos;
 
-			SeekToChar(';');
+			SIMD_SeekToChar(pos, ';');
 
-			stationName.len = pos - stationNameStart;
+			stationName.len = pos - stationName.data;
 			if (stationName.Bytes() > 0 && stationName.Bytes() <= 100) // The challenge specified only up to 100 byte names (seems like they all are in the file)
 			{
 				lowered = readbuf.PushLoweredStringCopy(stationName);
@@ -348,14 +324,13 @@ int main(int argc, char* argv[])
 	Vector<String> allStations(42000);
 	while (true)
 	{
-		if (pos >= data.len || data[pos] == '\0') break;
-		const u64 stationNameStart = pos;
+		if (pos >= dataEnd || *pos == '\0') break;
 		String stationName;
-		stationName.data = &data[pos];
+		stationName.data = pos;
 
-		SeekToChar('\n');
+		SIMD_SeekToChar(pos, '\n');
 
-		stationName.len = pos - stationNameStart;
+		stationName.len = pos - stationName.data;
 		allStations.Push(stationName);
 		pos++;
 	}
@@ -390,7 +365,7 @@ int main(int argc, char* argv[])
 
 		stationData.rMin = DBL_MAX;
 		stationData.rMax = -DBL_MAX;
-		stationData.rMean = 0;
+		stationData.rSum = 0;
 		stationData.count = 0;
 
 		if (i > 0)
@@ -545,7 +520,7 @@ int main(int argc, char* argv[])
 		writeBuf.PushF(stationData.name, '=');
 		Push1DecimalDouble(writeBuf, stationData.rMin);
 		writeBuf.Push('/');
-		Push1DecimalDouble(writeBuf, stationData.rMean);
+		Push1DecimalDouble(writeBuf, stationData.rSum / stationData.count);
 		writeBuf.Push('/');
 		Push1DecimalDouble(writeBuf, stationData.rMax);
 		first = false;

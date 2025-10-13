@@ -1,0 +1,2 @@
+powershell -ExecutionPolicy Bypass -File run_benchmark.ps1 -BenchmarkRuns 5 -WarmupRuns 1
+pause

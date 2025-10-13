@@ -289,5 +289,34 @@ struct Array
 
 #define ForVector(vec, iter) for (int iter = 0; i < vec.size; i++)
 
+template<typename T, u64 S>
+struct FixedArray
+{
+	T data[S];
+	const u64 size = S;
+
+	static u64 Bytes(const u64 num)
+	{
+		return num * sizeof(T);
+	}
+
+	u64 Bytes() const
+	{
+		return Bytes(size);
+	}
+
+	void Zero() const
+	{
+		memset(data, 0, Bytes());
+	}
+
+	T& operator[](u64 index)
+	{
+		assert(index < size);
+		return data[index];
+	}
+};
+
 raddbg_type_view(Vector<?>, array(data, size));
 raddbg_type_view(Array<?>, array(data, size));
+raddbg_type_view(FixedArray<?>, array(data, size));

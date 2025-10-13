@@ -37,18 +37,21 @@ struct String
 		assert(!Empty());
 	}
 
-	bool operator==(const String& other) const
+	bool Equals(const char* str, u64 len) const
 	{
-		AssertNotEmpty();
-		other.AssertNotEmpty();
-		if (len != other.len
-			|| data[0] != other.data[0]
-			|| data[len - 1] != other.data[len - 1])
+		if (len != len
+			|| data[0] != str[0]
+			|| data[len - 1] != str[len - 1])
 		{
 			return false;
 		}
 
-		return memcmp(data, other.data, Bytes()) == 0;
+		return memcmp(data, str, Bytes()) == 0;
+	}
+
+	bool operator==(const String& other) const
+	{
+		return Equals(other.data, other.len);
 	}
 
 	bool operator<(const String& other) const
@@ -93,16 +96,23 @@ struct String
 	}
 };
 
+static constexpr HASH_T FNV_SEED = 14695981039346656037ull;
+static constexpr HASH_T FNV_PRIME = 1099511628211ull;
+
+inline void fnv1aStep(const char c, HASH_T& hash)
+{
+	uint8_t value = c;
+	hash = hash ^ value;
+	hash *= FNV_PRIME;
+}
+
 inline HASH_T fnv1a(const void* key, const HASH_T len)
 {
 	const char* data = (char*)key;
-	HASH_T hash = 0xcbf29ce484222325;
-	HASH_T prime = 0x100000001b3;
+	HASH_T hash = FNV_SEED;
 
 	for (int i = 0; i < len; ++i) {
-		uint8_t value = data[i];
-		hash = hash ^ value;
-		hash *= prime;
+		fnv1aStep(data[i], hash);
 	}
 
 	return hash;
@@ -309,6 +319,14 @@ struct StringBuffer
 			u8 written = U64ToStringTreeTable(static_cast<u64>(i), Back());
 			Grow(written);
 		}
+	}
+
+	void Push(const char* str, const u64 len)
+	{
+		assert(str != nullptr && len > 0);
+		char* pos = Back();
+		Grow(len);
+		memcpy(pos, str, len);
 	}
 
 	void Push(const char* str)

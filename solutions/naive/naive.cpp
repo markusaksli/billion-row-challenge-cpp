@@ -14,22 +14,22 @@
 struct StationData
 {
 	double min = DBL_MAX;
-	double mean = 0;
-	uint32_t sampleCount = 0;
 	double max = -DBL_MAX;
+	double sum = 0;
+	int count = 0;
 
 	void AddMeasurement(double temp)
 	{
 		max = std::max(max, temp);
 		min = std::min(min, temp);
-		sampleCount++;
-		mean += (temp - mean) / sampleCount;
+		count++;
+		sum += temp;
 	}
 };
 
-double RoundTowardPositive1Decimal(const double d)
+static inline double RoundTowardPositive1Decimal(const double d)
 {
-	return ceil(d * 10) / 10.0;
+	return std::ceil(d * 10.0) * 0.1;
 }
 
 int main(int argc, char* argv[])
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 		if (!first) std::cout << u8", ";
 		std::cout << kv.first << u8"="
 			<< kv.second.min << u8"/"
-			<< RoundTowardPositive1Decimal(kv.second.mean) << u8"/"
+			<< RoundTowardPositive1Decimal(kv.second.sum / kv.second.count) << u8"/"
 			<< kv.second.max;
 		first = false;
 	}

@@ -39,9 +39,9 @@ void Push1DecimalDouble(StringBuffer& writeBuf, const double d)
 struct StationData
 {
 	double min = DBL_MAX;
+	double max = -DBL_MAX;
 	double sum = 0;
 	u32 count = 0;
-	double max = -DBL_MAX;
 
 	inline void Add(double temp)
 	{
@@ -50,12 +50,25 @@ struct StationData
 		count++;
 		sum += temp;
 	}
+
+	inline void Merge(const StationData& other)
+	{
+		if (other.max > max) max = other.max;
+		if (other.min < min) min = other.min;
+		sum += other.sum;
+		count += other.count;
+	}
 };
 
-char* pos = nullptr;
-char* fileEnd = nullptr;
+struct ThreadMemory
+{
+	std::thread* thread;
+	HashMap<String, StationData> map;
+	char* pos;
+	const char* parseEnd;
+};
 
-inline double ParseTempAsDouble()
+inline double ParseTempAsDouble(char*& pos)
 {
 	int sign = 1;
 	char c = *pos;
@@ -81,23 +94,18 @@ inline double ParseTempAsDouble()
 	return sign * (tens + frac * 0.1);
 }
 
-int main(int argc, char* argv[])
+void Parse(ThreadMemory* mem)
 {
-	MappedFileHandle file;
-	file.OpenRead(argv[1]);
-	fileEnd = &file.data[file.length];
-	pos = file.data + 3; // Skip BOM
-
-	HashMap<String, StationData> map(100);
-	while (pos < fileEnd)
+	mem->map.InitAuto(100);
+	while (mem->pos < mem->parseEnd)
 	{
 		String readString;
-		readString.data = pos;
-		SIMD_SeekToChar(pos, ';');
-		readString.len = pos - readString.data;
+		readString.data = mem->pos;
+		SIMD_SeekToChar(mem->pos, ';');
+		readString.len = mem->pos - readString.data;
 
 		u32* insertionIndex;
-		auto result = map.FindOrGetInsertionIndex(readString, insertionIndex);
+		auto result = mem->map.FindOrGetInsertionIndex(readString, insertionIndex);
 		StationData* stationData;
 		if (result)
 		{
@@ -105,16 +113,73 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			map.InsertIndexed(readString, StationData(), insertionIndex);
-			stationData = &map.items.Last().v;
+			mem->map.InsertIndexed(readString, StationData(), insertionIndex);
+			stationData = &mem->map.items.Last().v;
 		}
-		pos++;
+		mem->pos++;
 
-		stationData->Add(ParseTempAsDouble());
+		stationData->Add(ParseTempAsDouble(mem->pos));
+	}
+}
+
+int main(int argc, char* argv[])
+{
+	MappedFileHandle file;
+	file.OpenRead(argv[1]);
+	char* fileEnd = &file.data[file.length];
+	char* pos = file.data + 3; // Skip BOM
+
+	// u32 numThreads = 2;
+	u32 numThreads = std::thread::hardware_concurrency() - 1;
+	u64 perThreadBytes = file.length / numThreads;
+	Array<ThreadMemory> mem;
+	mem.InitMallocZero(numThreads);
+
+	// Partition the file
+	for (u32 i = 0; i < numThreads; i++)
+	{
+		mem[i].pos = pos;
+		if (i != numThreads - 1)
+		{
+			pos += perThreadBytes;
+			SIMD_SeekToChar(pos, '\n');
+			pos++;
+			mem[i].parseEnd = pos;
+		}
+	}
+	ThreadMemory& mainMem = mem[numThreads - 1];
+	mainMem.parseEnd = fileEnd;
+
+	// Parse
+	for (u32 i = 0; i < numThreads - 1; i++)
+	{
+		mem[i].thread = new std::thread(Parse, &mem[i]);
+	}
+	Parse(&mainMem);
+
+	// Merge results
+	for (u32 i = 0; i < numThreads - 1; i++)
+	{
+		ThreadMemory& other = mem[i];
+		other.thread->join();
+		for(u64 j = 0; j < other.map.items.size; j++)
+		{
+			u32* insertionIndex;
+			const auto& otherPair = other.map.items[j];
+			auto result = mainMem.map.FindOrGetInsertionIndex(otherPair.k, insertionIndex);
+			if (result)
+			{
+				result->v.Merge(otherPair.v);
+			}
+			else
+			{
+				mainMem.map.InsertIndexed(otherPair.k, otherPair.v, insertionIndex);
+			}
+		}
 	}
 
 	Array<u64> sortedStations;
-	sortedStations.InitMalloc(map.items.size);
+	sortedStations.InitMalloc(mainMem.map.items.size);
 	ForVector(sortedStations, i)
 	{
 		sortedStations[i] = i;
@@ -122,7 +187,7 @@ int main(int argc, char* argv[])
 
 	std::sort(sortedStations.data, sortedStations.data + sortedStations.size,
 		[&](const u64 a, const u64 b) {
-			return map.items[a].k < map.items[b].k;
+			return mainMem.map.items[a].k < mainMem.map.items[b].k;
 		});
 
 	StringBuffer writeBuf(4 * KB);
@@ -130,13 +195,13 @@ int main(int argc, char* argv[])
 	writeBuf.Push('{');
 
 	bool first = true;
-	for (u64 i = 0; i < map.items.size; i++)
+	for (u64 i = 0; i < mainMem.map.items.size; i++)
 	{
 		if (!first)
 		{
 			writeBuf.Push(", ");
 		}
-		const auto& pair = map.items[sortedStations[i]];
+		const auto& pair = mainMem.map.items[sortedStations[i]];
 		const StationData& stationData = pair.v;
 		writeBuf.PushF(pair.k, '=');
 		Push1DecimalDouble(writeBuf, stationData.min);

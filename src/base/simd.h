@@ -1,28 +1,55 @@
 #pragma once
 #include <immintrin.h>
 
-#define SIMD_Size 256
-#define SIMD_LoadUnAligned(a) _mm256_loadu_si256(a)
-#define SIMD_StoreUnAligned(dst, a) _mm256_storeu_si256(dst, a)
+#include "type_macros.h"
 
-#define SIMD_U16Size SIMD_Size / 16
-#define SIMD_CompU16EqMask(a, b) _mm256_cmpeq_epu16_mask(a, b)
-#define SIMD_BroadcastU16(a) _mm256_set1_epi16(a)
-
-#define SIMD_U8Size SIMD_Size / 8
-#define SIMD_CompU8EqMask(a, b) _mm256_cmpeq_epu8_mask(a, b)
-#define SIMD_BroadcastU8(a) _mm256_set1_epi8(a)
-
-typedef __mmask16 SIMD_U16Mask;
-typedef	u32 SIMD_U8Mask;
-typedef __m256i SIMD_Int;
-
-inline SIMD_U16Mask SIMD_CmpEqWideChar(const SIMD_Int i, const wchar_t c)
+inline void SIMD_SeekToChar64(char*& pos, const char c)
 {
-	return SIMD_CompU16EqMask(i, SIMD_BroadcastU16(c));
+	const __m256i target = _mm256_set1_epi8(c);
+	while (true)
+	{
+		__m256i chunk1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pos));
+		__m256i chunk2 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pos + 32));
+
+		// compare and build 64-bit mask
+		u32 mask1 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(chunk1, target));
+		u32 mask2 = _mm256_movemask_epi8(_mm256_cmpeq_epi8(chunk2, target));
+		u64 mask = static_cast<u64>(mask2) << 32 | mask1;
+
+		if (mask == 0)
+		{
+			pos += 64;
+			continue;
+		}
+
+		u64 offset = _tzcnt_u64(mask);  // first matching byte
+		pos += offset;
+		break;
+	}
 }
 
-inline SIMD_U8Mask SIMD_CmpEqChar(const SIMD_Int i, const char c)
+inline void SIMD_SeekToChar32(char*& pos, const char c)
 {
-	return SIMD_CompU8EqMask(i, SIMD_BroadcastU8(c));
+	const __m256i target = _mm256_set1_epi8(c);
+	while (true)
+	{
+		__m256i chunk = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pos));
+
+		// compare and build 64-bit mask
+		u32 mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(chunk, target));
+		if (mask == 0)
+		{
+			pos += 32;
+			continue;
+		}
+
+		u32 offset = _tzcnt_u32(mask);  // first matching byte
+		pos += offset;
+		break;
+	}
+}
+
+inline void SIMD_SeekToChar(char*& pos, const char c)
+{
+	SIMD_SeekToChar32(pos, c);
 }
