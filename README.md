@@ -5,7 +5,7 @@ Contains much more performant code to generate the input data.
 
 ## Results
 
-|Program                         |Average|Best  |Worst |Cold  |
+|Solution                        |Average|Best  |Worst |Cold  |
 |--------------------------------|-------|------|------|------|
 |[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp)|3.05s  |3.04s |3.06s |3.04s |
 |[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp)|4.06s  |4.06s |4.07s |4.07s |
