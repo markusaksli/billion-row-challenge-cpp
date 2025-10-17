@@ -306,7 +306,14 @@ struct MappedFileHandle
 	{
 		Close();
 
-		fileHandle = ::CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		fileHandle = ::CreateFileA(filename,
+			GENERIC_READ,
+			FILE_SHARE_READ,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
+			NULL);
+
 		if (fileHandle == INVALID_HANDLE_VALUE)
 		{
 			PrintLastWinError("CreateFileA(OpenRead) failed: ");
@@ -348,6 +355,28 @@ struct MappedFileHandle
 		data = (char*)ptr;
 		return true;
 	}
-
 #endif // _WIN32
 };
+
+#ifdef _WIN32
+static bool PrefetchVirtualMemory(const void* base, const size_t bytes, const size_t prefetchChunk)
+{
+	// Prepare in chunks to avoid giant requests
+	SIZE_T offset = 0;
+	while (offset < bytes)
+	{
+		SIZE_T chunk = std::min((SIZE_T)prefetchChunk, bytes - offset);
+		WIN32_MEMORY_RANGE_ENTRY range;
+		range.VirtualAddress = (PVOID)((char*)base + offset);
+		range.NumberOfBytes = (SIZE_T)chunk;
+		// Prefetch; returns nonzero on success
+		BOOL ok = PrefetchVirtualMemory(GetCurrentProcess(), 1, &range, 0);
+		if (!ok)
+		{
+			return false;
+		}
+		offset += chunk;
+	}
+	return true;
+}
+#endif

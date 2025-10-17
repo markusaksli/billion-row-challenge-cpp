@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <cfloat>
 #include <iomanip>
 #include <iostream>
 
@@ -7,7 +6,6 @@
 #include "../../src/base/hash_map.h"
 #include "../../src/base/platform_io.h"
 #include "../../src/base/simd.h"
-#include "../../src/base/type_macros.h"
 
 void Push1DecimalDouble(StringBuffer& writeBuf, const s64 scaled)
 {
@@ -52,10 +50,7 @@ struct StationData
 	}
 };
 
-char* pos = nullptr;
-char* fileEnd = nullptr;
-
-inline double ParseTempAsDouble()
+inline double ParseTempAsDouble(char*& pos)
 {
 	int sign = 1;
 	char c = *pos;
@@ -85,8 +80,8 @@ int main(int argc, char* argv[])
 {
 	MappedFileHandle file;
 	file.OpenRead(argv[1]);
-	fileEnd = &file.data[file.length];
-	pos = file.data + 3; // Skip BOM
+	char* fileEnd = &file.data[file.length];
+	char* pos = file.data + 3; // Skip BOM
 
 	HashMap<String, StationData> map(100);
 	while (pos < fileEnd)
@@ -110,7 +105,7 @@ int main(int argc, char* argv[])
 		}
 		pos++;
 
-		stationData->Add(ParseTempAsDouble());
+		stationData->Add(ParseTempAsDouble(pos));
 	}
 
 	Array<u64> sortedStations;

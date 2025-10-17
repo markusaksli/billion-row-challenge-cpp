@@ -1,0 +1,5 @@
+﻿Solution,Average,Best,Worst,Cold,Runs
+markusaksli_fast_threaded.exe,3.03s,3.03s,3.04s,3.04s,5
+markusaksli_default_threaded.exe,4.04s,4.03s,4.05s,4.03s,5
+markusaksli_fast.exe,21.21s,21.16s,21.24s,21.24s,5
+markusaksli_default.exe,27.28s,27.2s,27.46s,27.2s,5

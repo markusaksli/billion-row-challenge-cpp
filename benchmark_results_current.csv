@@ -1,7 +1,7 @@
-﻿Program,Average_s,Best_s,Worst_s,Cold_s,Runs
-markusaksli_fast_threaded.exe,3.05,3.04,3.06,3.04,5
-markusaksli_default_threaded.exe,4.06,4.06,4.07,4.07,5
-markusaksli_fast.exe,21.49,21.28,22.3,21.29,5
-markusaksli_default.exe,29.99,28.36,33.44,28.36,5
-naive_plus.exe,96.65,95.13,102.62,102.62,5
-naive.exe,195.99,194.37,197.43,194.37,5
+﻿Program,Average,Best,Worst,Cold
+[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp),3.03s,3.03s,3.04s,3.04s
+[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp),4.04s,4.03s,4.05s,4.03s
+[markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp),21.21s,21.16s,21.24s,21.24s
+[markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp),27.28s,27.2s,27.46s,27.2s
+[naive_plus](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive_plus/naive_plus.cpp),96.65s,95.13s,102.62s,102.62s
+[naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp),195.99s,194.37s,197.43s,194.37s

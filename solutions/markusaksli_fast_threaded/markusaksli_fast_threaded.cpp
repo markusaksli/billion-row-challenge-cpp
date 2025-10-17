@@ -1,12 +1,12 @@
 #include <algorithm>
-#include <cfloat>
 #include <iomanip>
 #include <iostream>
 
 #include "../../src/base/buf_string.h"
 #include "../../src/base/platform_io.h"
 #include "../../src/base/simd.h"
-#include "../../src/base/type_macros.h"
+
+#define NUM_STATIONS 100
 
 void Push1DecimalDouble(StringBuffer& writeBuf, const s64 scaled)
 {
@@ -37,27 +37,32 @@ void Push1DecimalDouble(StringBuffer& writeBuf, const double d)
 
 struct StationData
 {
-	double min = DBL_MAX;
-	double max = -DBL_MAX;
-	double sum = 0;
+	s16 min = 32767;
+	s16 max = -32768;
 	u32 count = 0;
-	u32 entryIndex = 0;
+	s64 sum = 0;
 
-	__forceinline void Add(double temp)
+	__forceinline void Add(s16 temp)
 	{
 		if (temp < min) min = temp;
 		if (temp > max) max = temp;
-		sum += temp;
 		++count;
+		sum += temp;
 	}
 
 	__forceinline void Merge(const StationData& other)
 	{
 		if (other.max > max) max = other.max;
 		if (other.min < min) min = other.min;
-		sum += other.sum;
 		count += other.count;
+		sum += other.sum;
 	}
+};
+
+struct StationMapping
+{
+	u32 header;
+	u32 data;
 };
 
 // Use a fixed size flat power of 2 map with linear probing
@@ -89,7 +94,7 @@ struct FixedFlatHashMapPow2
 		memset(items, 0, sizeof(Entry) * capacity);
 	}
 
-	__forceinline u32 FindOrInsert(const String& k, const HASH_T hash, u32& numStations, StationData* stations)
+	__forceinline u32 FindOrInsert(const String& k, const HASH_T hash, u32& numStations, u32 stationToHeader[NUM_STATIONS])
 	{
 		u32 idx = hash & (capacity - 1); // Requires power of 2 size
 		Entry* __restrict entries = items;
@@ -99,12 +104,12 @@ struct FixedFlatHashMapPow2
 			Entry& e = entries[idx];
 			if (e.namelen == 0)
 			{
-				assert(numStations < 100);
+				assert(numStations < NUM_STATIONS);
 				e.hash = hash;
 				e.name = k.data;
 				e.namelen = k.len;
 				e.valueIndex = numStations;
-				stations[numStations].entryIndex = idx;
+				stationToHeader[numStations] = idx;
 				u32 ret = numStations;
 				++numStations;
 				return ret;
@@ -121,34 +126,39 @@ struct ThreadMemory
 	char* pos;
 	const char* parseEnd;
 	FixedFlatHashMapPow2 map;
-	Array<StationData> stations;
+	FixedArray<StationData, NUM_STATIONS> stations;
+	FixedArray<u32, NUM_STATIONS> stationToHeader;
 	u32 numStations = 0;
 };
 
-inline double ParseTempAsDouble(char*& pos)
+__forceinline s16 ParseTempAsS16SingleLoad(char*& pos)
 {
-	int sign = 1;
-	char c = *pos;
+	s16 sign = 1;
+	u64 data = *((u64*)pos);
+	u8 c = data & 0xff;
+	data = data >> 8;
 	if (c == '-')
 	{
 		sign = -1;
 		++pos;
-		c = *pos;
+		c = data & 0xff;
+		data = data >> 8;
 	}
-	int tens = c - '0';
+	s16 tens = (c - '0') * 10;
 
-	++pos;
-	c = *pos;
+	c = data & 0xff;
+	data = data >> 8;
 	if (c != '.') {
-		tens = tens * 10 + (c - '0');
+		tens = tens * 10 + (c - '0') * 10;
 		++pos;
+		data = data >> 8;
 	}
-	++pos;
 
-	int frac = *pos - '0';
-	pos += 2;
+	c = data & 0xff;
+	tens = sign * (tens + c - '0');
+	pos += 4;
 
-	return sign * (tens + frac * 0.1);
+	return tens;
 }
 
 __forceinline void SeekAndHash_1(char*& pos, HASH_T& hash)
@@ -163,8 +173,7 @@ __forceinline void SeekAndHash_1(char*& pos, HASH_T& hash)
 void Parse(ThreadMemory* mem)
 {
 	mem->map.Init();
-	mem->stations.InitMalloc(100);
-	ForVector(mem->stations, i)
+	for (u32 i = 0; i < NUM_STATIONS; i++)
 	{
 		mem->stations[i] = StationData();
 	}
@@ -177,11 +186,11 @@ void Parse(ThreadMemory* mem)
 		SeekAndHash_1(mem->pos, hash);
 		readString.len = mem->pos - readString.data;
 
-		u32 result = mem->map.FindOrInsert(readString, hash, mem->numStations, mem->stations.data);
+		u32 result = mem->map.FindOrInsert(readString, hash, mem->numStations, mem->stationToHeader.data);
 		StationData& stationData = mem->stations[result];
 		mem->pos++;
 
-		stationData.Add(ParseTempAsDouble(mem->pos));
+		stationData.Add(ParseTempAsS16SingleLoad(mem->pos));
 	}
 }
 
@@ -205,6 +214,8 @@ int main(int argc, char* argv[])
 		if (i != numThreads - 1)
 		{
 			pos += perThreadBytes;
+			// No matter what kind of prefetching I try it just doesn't seem to beat default paging on windows
+			// PrefetchVirtualMemory(file.data, 64 * MB, 4 * MB);
 			SIMD_SeekToChar(pos, '\n');
 			pos++;
 			mem[i].parseEnd = pos;
@@ -228,16 +239,24 @@ int main(int argc, char* argv[])
 		for (u64 j = 0; j < other.numStations; j++)
 		{
 			const StationData& otherData = other.stations[j];
-			const auto& otherEntry = other.map.items[otherData.entryIndex];
-			u32 result = mainMem.map.FindOrInsert(String((char*)otherEntry.name, otherEntry.namelen), otherEntry.hash, mainMem.numStations, mainMem.stations.data);
+			const auto& otherEntry = other.map.items[other.stationToHeader[j]];
+			u32 result = mainMem.map.FindOrInsert(String((char*)otherEntry.name, otherEntry.namelen), otherEntry.hash, mainMem.numStations, mainMem.stationToHeader.data);
 			StationData& stationData = mainMem.stations[result];
 			stationData.Merge(otherData);
 		}
 	}
 
-	std::sort(mainMem.stations.data, mainMem.stations.data + mainMem.stations.size,
-		[&](const StationData& a, const StationData& b) {
-			return mainMem.map.items[a.entryIndex] < mainMem.map.items[b.entryIndex];
+	FixedArray<StationMapping, NUM_STATIONS> mapping;
+	for (u32 i = 0; i < NUM_STATIONS; i++)
+	{
+		mapping[i].data = i;
+		mapping[i].header = mainMem.stationToHeader[i];
+	}
+
+	// Sort and output
+	std::sort(mapping.data, mapping.data + NUM_STATIONS,
+		[&](const StationMapping& a, const StationMapping& b) {
+			return mainMem.map.items[a.header] < mainMem.map.items[b.header];
 		});
 
 	StringBuffer writeBuf(4 * KB);
@@ -245,20 +264,22 @@ int main(int argc, char* argv[])
 	writeBuf.Push('{');
 
 	bool first = true;
-	for (u64 i = 0; i < mainMem.numStations; i++)
+	for (u32 i = 0; i < NUM_STATIONS; i++)
 	{
 		if (!first)
 		{
 			writeBuf.Push(", ");
 		}
-		const StationData& stationData = mainMem.stations[i];
-		writeBuf.Push(mainMem.map.items[stationData.entryIndex].name, mainMem.map.items[stationData.entryIndex].namelen);
+		const StationMapping m = mapping[i];
+		const StationData& stationData = mainMem.stations[m.data];
+		const auto header = mainMem.map.items[m.header];
+		writeBuf.Push(header.name, header.namelen);
 		writeBuf.Push('=');
-		Push1DecimalDouble(writeBuf, stationData.min);
+		Push1DecimalDouble(writeBuf, stationData.min * 0.1);
 		writeBuf.Push('/');
-		Push1DecimalDoubleRoundTowardPositive(writeBuf, stationData.sum / stationData.count);
+		Push1DecimalDoubleRoundTowardPositive(writeBuf, (stationData.sum * 0.1) / stationData.count);
 		writeBuf.Push('/');
-		Push1DecimalDouble(writeBuf, stationData.max);
+		Push1DecimalDouble(writeBuf, stationData.max * 0.1);
 		first = false;
 	}
 

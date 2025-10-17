@@ -1,0 +1,15 @@
+// raddbg 0.9.21 project file
+
+recent_file: path: "../markusaksli_fast/markusaksli_fast.cpp"
+target:
+{
+  executable: "../markusaksli_fast/x64/Release/markusaksli_fast.exe"
+  working_directory: "../markusaksli_fast/x64/Release/"
+  enabled: 1
+  arguments: "\"C:\\Development\\Projects\\billion_row_challenge\\data\\1brc.txt\""
+}
+breakpoint:
+{
+  source_location: "../markusaksli_fast/markusaksli_fast.cpp:293:1"
+  hit_count: 1
+}

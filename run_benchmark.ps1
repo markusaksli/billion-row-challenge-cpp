@@ -16,9 +16,10 @@ $PROGRAMS = @(
     "solutions\markusaksli_fast_threaded\x64\Release\markusaksli_fast_threaded.exe",
     "solutions\markusaksli_default_threaded\x64\Release\markusaksli_default_threaded.exe",
     "solutions\markusaksli_fast\x64\Release\markusaksli_fast.exe",
-    "solutions\markusaksli_default\x64\Release\markusaksli_default.exe",
-    "solutions\naive_plus\x64\Release\naive_plus.exe",
-    "solutions\naive\x64\Release\naive.exe"
+    "solutions\markusaksli_default\x64\Release\markusaksli_default.exe"
+# These take waaaaaaaayyyyy too long for me to bother to run them again
+#    "solutions\naive_plus\x64\Release\naive_plus.exe",
+#    "solutions\naive\x64\Release\naive.exe"
 )
 
 function Test-Admin {
@@ -95,7 +96,7 @@ if ($FlushCache -and -not (Test-Admin)) {
 }
 
 # --- Initialize results CSV ---
-"Program,Average_s,Best_s,Worst_s,Cold_s,Runs" | Out-File -FilePath $OUTPUT_CSV -Encoding UTF8
+"Solution,Average,Best,Worst,Cold,Runs" | Out-File -FilePath $OUTPUT_CSV -Encoding UTF8
 
 $results = @()
 
@@ -110,7 +111,7 @@ foreach ($program in $PROGRAMS) {
         continue
     }
     
-    # Warmup runs (optional)
+    # Warmup runs
     for ($i = 0; $i -lt $WarmupRuns; $i++) {
         Write-Host "  Warmup run $($i + 1)/$WarmupRuns..." -ForegroundColor Gray
         $tempFile = [System.IO.Path]::GetTempFileName()
@@ -192,7 +193,7 @@ foreach ($program in $PROGRAMS) {
 			Runs = $runTimes.Count
 		}
 		
-        "$programName,$avgSec,$minSec,$maxSec,$coldSec,$($runTimes.Count)" | Add-Content -Path $OUTPUT_CSV -Encoding UTF8
+        "$programName,$($avgSec)s,$($minSec)s,$($maxSec)s,$($coldSec)s,$($runTimes.Count)" | Add-Content -Path $OUTPUT_CSV -Encoding UTF8
     }
 }
 

@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <cfloat>
 #include <iomanip>
 #include <iostream>
 
@@ -7,7 +6,6 @@
 #include "../../src/base/hash_map.h"
 #include "../../src/base/platform_io.h"
 #include "../../src/base/simd.h"
-#include "../../src/base/type_macros.h"
 
 void Push1DecimalDouble(StringBuffer& writeBuf, const s64 scaled)
 {

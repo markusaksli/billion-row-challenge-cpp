@@ -293,16 +293,15 @@ template<typename T, u64 S>
 struct FixedArray
 {
 	T data[S];
-	const u64 size = S;
 
 	static u64 Bytes(const u64 num)
 	{
 		return num * sizeof(T);
 	}
 
-	u64 Bytes() const
+	static u64 Bytes()
 	{
-		return Bytes(size);
+		return Bytes(S);
 	}
 
 	void Zero() const
@@ -312,7 +311,7 @@ struct FixedArray
 
 	T& operator[](u64 index)
 	{
-		assert(index < size);
+		assert(index < S);
 		return data[index];
 	}
 };

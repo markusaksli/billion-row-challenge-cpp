@@ -53,3 +53,8 @@ inline void SIMD_SeekToChar(char*& pos, const char c)
 {
 	SIMD_SeekToChar32(pos, c);
 }
+
+inline void SIMD_Prefetch(const char* pos)
+{
+	_mm_prefetch(pos + 256, _MM_HINT_T0);
+}

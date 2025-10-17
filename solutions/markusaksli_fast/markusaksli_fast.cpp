@@ -1,11 +1,11 @@
 #include <algorithm>
-#include <cfloat>
 #include <iomanip>
 #include <iostream>
 
 #include "../../src/base/buf_string.h"
 #include "../../src/base/platform_io.h"
-#include "../../src/base/type_macros.h"
+
+#define NUM_STATIONS 100
 
 void Push1DecimalDouble(StringBuffer& writeBuf, const s64 scaled)
 {
@@ -34,37 +34,45 @@ void Push1DecimalDouble(StringBuffer& writeBuf, const double d)
 	Push1DecimalDouble(writeBuf, scaled);
 }
 
-struct StationData
+struct StationData // Only 16 bytes!
 {
-	double min = DBL_MAX;
-	double max = -DBL_MAX;
-	double sum = 0;
+	s16 min = 32767;
+	s16 max = -32768;
 	u32 count = 0;
-	u32 entryIndex = 0;
+	s64 sum = 0;
 
-	__forceinline void Add(double temp)
+	__forceinline void Add(s16 temp)
 	{
 		if (temp < min) min = temp;
 		if (temp > max) max = temp;
-		sum += temp;
 		++count;
+		sum += temp;
 	}
 };
 
-// Use a fixed size flat power of 2 map with linear probing
+struct StationMapping
+{
+	u32 header;
+	u32 data;
+};
+
+// Compact representation for key strings in a buffer, also allows us to index into the buffer instead of storing full pointers for the key strings
+StringBuffer strbuf(1 * KB);
+
+// Fixed size flat power of 2 map with linear probing
 struct FixedFlatHashMapPow2
 {
 	static constexpr u64 capacity = 512;
 
-	struct Entry // Compact key struct to fit more in cache
+	struct Entry // Compact key struct to fit more in cache (only 4 bytes)
 	{
-		const char* name;
-		u32 namelen;
-		u32 valueIndex;
+		u16 name;
+		u8 namelen;
+		u8 valueIndex;
 
 		__forceinline bool operator<(const Entry& other) const
 		{
-			const int cmp = strncmp(name, other.name, (namelen < other.namelen) ? namelen : other.namelen);
+			const int cmp = strncmp(&strbuf[name], &strbuf[other.name], (namelen < other.namelen) ? namelen : other.namelen);
 
 			if (cmp < 0) return true;
 			if (cmp > 0) return false;
@@ -79,7 +87,7 @@ struct FixedFlatHashMapPow2
 		memset(items, 0, sizeof(Entry) * capacity);
 	}
 
-	__forceinline u32 FindOrInsert(const String& k, const HASH_T hash, u32& numStations, StationData* stations)
+	__forceinline u32 FindOrInsert(const String& k, const HASH_T hash, u32& numStations, u32 stationToHeader[NUM_STATIONS])
 	{
 		u32 idx = hash & (capacity - 1); // Requires power of 2 size
 		Entry* __restrict entries = items;
@@ -89,27 +97,35 @@ struct FixedFlatHashMapPow2
 			Entry& e = entries[idx];
 			if (e.namelen == 0)
 			{
-				e.name = k.data;
+				e.name = strbuf.Bytes();
 				e.namelen = k.len;
+				String str = strbuf.PushStringCopy(k);
 				e.valueIndex = numStations;
-				stations[numStations].entryIndex = idx;
+				stationToHeader[numStations] = idx;
 				u32 ret = numStations;
 				++numStations;
 				return ret;
 			}
-			if (k.Equals(e.name, e.namelen)) return e.valueIndex;
+			if (k.Equals(&strbuf[e.name], e.namelen)) return e.valueIndex;
 			idx = (idx + 1) & (capacity - 1);
 		}
 	}
 };
 
-MappedFileHandle file;
-char* pos = nullptr;
-char* fileEnd = nullptr;
-
-__forceinline double ParseTempAsDouble()
+_forceinline void GetByteAndShiftU64(u8& c, u64& x, const u8 n = 1)
 {
-	int sign = 1;
+	c = x & 0xff;
+	x = x >> (8 * n);
+}
+
+// Parsing as s16 avoids FP in the hot loop and allows us to make the temp struct smaller.
+
+// Assembly is different thanks to the strategy here but hard to tell if there's a performance impact, single load is maybe ever so slightly faster?
+// Everything should be in cache anyway so realistically the pointer dereferences in the normal version should all come from cache.
+/*
+__forceinline s16 ParseTempAsS16(char*& pos)
+{
+	s16 sign = 1;
 	char c = *pos;
 	if (c == '-') 
 	{
@@ -117,23 +133,54 @@ __forceinline double ParseTempAsDouble()
 		++pos;
 		c = *pos;
 	}
-	int tens = c - '0';
+	s16 tens = (c - '0') * 10;
 
 	++pos;
 	c = *pos;
 	if (c != '.') {
-		tens = tens * 10 + (c - '0');
+		tens = tens * 10 + (c - '0') * 10;
 		++pos;
 	}
 	++pos;
 
-	int frac = *pos - '0';
+	tens = sign * (tens + *pos - '0');
 	pos += 2;
 
-	return sign * (tens + frac * 0.1);
+	return tens;
+}
+*/
+
+__forceinline s16 ParseTempAsS16SingleLoad(char*& pos)
+{
+	s16 sign = 1;
+	u64 data = *((u64*)pos);
+	u8 c = data & 0xff;
+	data = data >> 8;
+	if (c == '-')
+	{
+		sign = -1;
+		++pos;
+		c = data & 0xff;
+		data = data >> 8;
+	}
+	s16 tens = (c - '0') * 10;
+
+	c = data & 0xff;
+	data = data >> 8;
+	if (c != '.') {
+		tens = tens * 10 + (c - '0') * 10;
+		++pos;
+		data = data >> 8;
+	}
+
+	c = data & 0xff;
+	tens = sign * (tens + c - '0');
+	pos += 4;
+
+	return tens;
 }
 
-__forceinline void SeekAndHash_1(HASH_T& hash)
+__forceinline void SeekAndHash_1(char*& pos, HASH_T& hash)
 {
 	while (*pos != ';')
 	{
@@ -143,9 +190,8 @@ __forceinline void SeekAndHash_1(HASH_T& hash)
 }
 
 // None of these are faster than a simple byte by byte read where we touch each byte once... go figure
-
 /*
-__forceinline void SeekAndHash_8(HASH_T& hash)
+__forceinline void SeekAndHash_8(char*& pos, HASH_T& hash)
 {
 	while (true)
 	{
@@ -168,7 +214,7 @@ __forceinline void SeekAndHash_8(HASH_T& hash)
 	}
 }
 
-__forceinline void SeekAndHash_32(HASH_T& hash)
+__forceinline void SeekAndHash_32(char*& pos, HASH_T& hash)
 {
 	const __m256i target = _mm256_set1_epi8(';');
 	while (true)
@@ -194,7 +240,7 @@ __forceinline void SeekAndHash_32(HASH_T& hash)
 	}
 }
 
-__forceinline void SeekAndHash_64(HASH_T& hash)
+__forceinline void SeekAndHash_64(char*& pos, HASH_T& hash)
 {
 	const __m256i target = _mm256_set1_epi8(';');
 	__m256i chunk1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pos));
@@ -213,7 +259,7 @@ __forceinline void SeekAndHash_64(HASH_T& hash)
 	pos += offset;
 }
 
-__forceinline void SeekAndHash_SIMDHash64(HASH_T& hash)
+__forceinline void SeekAndHash_SIMDHash64(char*& pos, HASH_T& hash)
 {
 	const __m256i target = _mm256_set1_epi8(';');
 	const __m256i chunk1 = _mm256_loadu_si256((__m256i*)pos);
@@ -269,13 +315,15 @@ __forceinline void SeekAndHash_SIMDHash64(HASH_T& hash)
 
 int main(int argc, char* argv[])
 {
+	MappedFileHandle file;
 	file.OpenRead(argv[1]);
-	fileEnd = &file.data[file.length];
-	pos = file.data + 3; // Skip BOM
+	char* fileEnd = &file.data[file.length];
+	char* pos = file.data + 3; // Skip BOM
 
 	FixedFlatHashMapPow2 map;
-	FixedArray<StationData, 100> stations;
-	ForVector(stations, i)
+	FixedArray<StationData, NUM_STATIONS> stations;
+	FixedArray<u32, NUM_STATIONS> stationToHeader;
+	for (u32 i = 0; i < NUM_STATIONS; i++)
 	{
 		stations[i] = StationData();
 	}
@@ -287,21 +335,27 @@ int main(int argc, char* argv[])
 		String readString;
 		readString.data = pos;
 		HASH_T hash = FNV_PRIME;
-		SeekAndHash_1(hash);
+		SeekAndHash_1(pos, hash);
 		readString.len = pos - readString.data;
 
-		u32 result = map.FindOrInsert(readString, hash, numStations, stations.data);
+		u32 result = map.FindOrInsert(readString, hash, numStations, stationToHeader.data);
 		StationData& stationData = stations[result];
 		pos++;
 
-		stationData.Add(ParseTempAsDouble());
+		stationData.Add(ParseTempAsS16SingleLoad(pos));
 	}
 
 	// 95% spent above, don't really care about the sort
+	FixedArray<StationMapping, NUM_STATIONS> mapping;
+	for (u32 i = 0; i < NUM_STATIONS; i++)
+	{
+		mapping[i].data = i;
+		mapping[i].header = stationToHeader[i];
+	}
 
-	std::sort(stations.data, stations.data + stations.size,
-		[&](const StationData& a, const StationData& b) {
-			return map.items[a.entryIndex] < map.items[b.entryIndex];
+	std::sort(mapping.data, mapping.data + NUM_STATIONS,
+		[&](const StationMapping& a, const StationMapping& b) {
+			return map.items[a.header] < map.items[b.header];
 		});
 
 	StringBuffer writeBuf(4 * KB);
@@ -309,20 +363,22 @@ int main(int argc, char* argv[])
 	writeBuf.Push('{');
 
 	bool first = true;
-	for (u64 i = 0; i < numStations; i++)
+	for (u32 i = 0; i < NUM_STATIONS; i++)
 	{
 		if (!first)
 		{
 			writeBuf.Push(", ");
 		}
-		const StationData& stationData = stations[i];
-		writeBuf.Push(map.items[stationData.entryIndex].name, map.items[stationData.entryIndex].namelen);
+		const StationMapping m = mapping[i];
+		const StationData& stationData = stations[m.data];
+		const auto header = map.items[m.header];
+		writeBuf.Push(&strbuf[header.name], header.namelen);
 		writeBuf.Push('=');
-		Push1DecimalDouble(writeBuf, stationData.min);
+		Push1DecimalDouble(writeBuf, stationData.min * 0.1);
 		writeBuf.Push('/');
-		Push1DecimalDoubleRoundTowardPositive(writeBuf, stationData.sum / stationData.count);
+		Push1DecimalDoubleRoundTowardPositive(writeBuf, (stationData.sum * 0.1) / stationData.count);
 		writeBuf.Push('/');
-		Push1DecimalDouble(writeBuf, stationData.max);
+		Push1DecimalDouble(writeBuf, stationData.max * 0.1);
 		first = false;
 	}
 
