@@ -80,7 +80,18 @@ Multithreaded version of [markusaksli_default](https://github.com/markusaksli/bi
 ### [markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp)
 Multithreaded version of [markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp) with the same principles.
 
+**Final findings**
+- 97% of CPU time spent in the parsing function.
+  - 70% in parsing numbers and adding to station data
+  - 17% in parsing and hashing station names
+  - 8% in hashmap lookup
+- 1% spent merging results and sorting
+- At 3036 ms over 15505.85 MB is 5107.32 MB/s, which is 71.69% of my benchmarked SSD sequential read speed
+- 3036ms at an average all-core clock rate of 5100 MHz is 15483600000 CPU cycles, which over 15505850382 bytes is 0.9986 CPU cycles/byte
+
 ### Potential unexplored optimizations
-- Running a search to make a perfect hash function (probably the biggest improvement)
-- Post-parse per-thread restructuring and partial sorting for faster merge at the end
-- Replacing std::sort (quicksort) with a radix sort
+- Running a search to make a perfect hash function (probably the biggest improvement?)
+- Merge and sort improvements
+  - Post-parse per-thread restructuring and partial sorting for faster merge at the end
+  - Replacing std::sort (quicksort) with a radix sort
+  - Basically pointless based on the CPU time distribution
