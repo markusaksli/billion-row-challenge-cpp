@@ -86,7 +86,7 @@ Multithreaded version of [markusaksli_fast](https://github.com/markusaksli/billi
   - 17% in parsing and hashing station names
   - 8% in hashmap lookup
 - 1% spent merging results and sorting
-- At 3036 ms over 15505.85 MB is 5107.32 MB/s, which is 71.69% of my benchmarked SSD sequential read speed
+- 3036 ms over 15505.85 MB is 5107.32 MB/s, which is 71.69% of my benchmarked SSD sequential read speed
 - 3036ms at an average all-core clock rate of 5100 MHz is 15483600000 CPU cycles, which over 15505850382 bytes is 0.9986 CPU cycles/byte
 
 ### Potential unexplored optimizations
