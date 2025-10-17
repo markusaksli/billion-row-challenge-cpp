@@ -42,6 +42,8 @@ See [1BRC Rules and limits](https://github.com/gunnarmorling/1brc?tab=readme-ov-
 
 Worth noting that the actual longest station name in the input data is `Dolores Hidalgo Cuna de la Independencia Nacional` at 49 bytes, even though it's stated it will be < 100 bytes.
 
+The original challenge specified that the file would be read from a RAM disk, but I preferred to optimize for something actually being read from disk.
+
 ## Included Solutions
 ### [naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp)
 The canonical simple way to solve the challenge in C++ (although it already needs some platform-specific code on Windows to output in UTF-8).
