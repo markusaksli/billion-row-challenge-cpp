@@ -5,14 +5,15 @@ Contains much more performant code to generate the input data.
 
 ## Results
 
-|Solution                        |Average|Best  |Worst |Cold  |
-|--------------------------------|-------|------|------|------|
-|[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp)|3.05s  |3.04s |3.06s |3.04s |
-|[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp)|4.06s  |4.06s |4.07s |4.07s |
-|[markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp)|21.49s |21.28s|22.3s |21.29s|
-|[markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp)|29.99s |28.36s|33.44s|28.36s|
-|[naive_plus](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive_plus/naive_plus.cpp)|96.65s |95.13s|102.62s|102.62s|
-|[naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp)|195.99s|194.37s|197.43s|194.37s|
+|Solution                                                                                                                                                                    |Average|Best   |Worst  |Cold   |
+|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------|-------|-------|-------|
+|[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp)         |3.03s  |3.03s  |3.04s  |3.04s  |
+|[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp)|4.04s  |4.03s  |4.05s  |4.03s  |
+|[markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp)                                    |21.21s |21.16s |21.24s |21.24s |
+|[markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp)                           |27.28s |27.2s  |27.46s |27.2s  |
+|[naive_plus](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive_plus/naive_plus.cpp)                                                      |96.65s |95.13s |102.62s|102.62s|
+|[naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp)                                                                     |195.99s|194.37s|197.43s|194.37s|
+
 ### Hardware
 - CPU: AMD Ryzen 9 7950X 16-Core Processor
 - RAM: 64.0 GB
@@ -62,10 +63,12 @@ My default code for parsing text and using my simple base layer data structures.
 An actual attempt at optimizing my default approach.
 
 **Improvements**
+- Parsing and storing only minimal int station data (16 bytes) with a single 8 byte load per temperature
 - Using a fixed-size flat power-of-2 hash map with linear probing for even simpler lookups
-- Custom compact key structure for the map so more of them can fit in cache
+- Custom compact 4 byte key structure for the map so more of them can fit in cache
 - Did some experimentation on the quickest way to parse the delimiter, turns out just a basic char-by-char loop that combines calculating the hash worked better than anything smart.
 - Didn't do any hash seed searching in the source station names for a perfect hash function, felt too hacky or cheap.
+- Didn't manage to get any I/O improvements by touching pages or prefetching.
 
 ### [markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp)
 Multithreaded version of [markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp).
@@ -79,6 +82,5 @@ Multithreaded version of [markusaksli_fast](https://github.com/markusaksli/billi
 
 ### Potential unexplored optimizations
 - Running a search to make a perfect hash function (probably the biggest improvement)
-- Reducing the number of page faults in the memory-mapped read or swapping for buffered sequential reads
 - Post-parse per-thread restructuring and partial sorting for faster merge at the end
 - Replacing std::sort (quicksort) with a radix sort
