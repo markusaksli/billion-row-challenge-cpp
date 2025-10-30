@@ -1,7 +1,7 @@
-﻿Program,Average,Best,Worst,Cold
-[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp),3.03s,3.03s,3.04s,3.04s
-[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp),4.04s,4.03s,4.05s,4.03s
-[markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp),21.21s,21.16s,21.24s,21.24s
-[markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp),27.28s,27.2s,27.46s,27.2s
-[naive_plus](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive_plus/naive_plus.cpp),96.65s,95.13s,102.62s,102.62s
-[naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp),195.99s,194.37s,197.43s,194.37s
+﻿Solution,Average,Best,Worst,Cold
+[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp),3.03s,3.02s,3.04s,3.03s
+[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp),4.03s,4.02s,4.04s,4.04s
+[markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp),22.18s,22.16s,22.21s,22.16s
+[markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp),28.66s,27.19s,31.42s,28.21s
+[naive_plus](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive_plus/naive_plus.cpp),95.87s,94.57s,97.76s,94.57s
+[naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp),209.66s,198.41s,233.22s,198.41s

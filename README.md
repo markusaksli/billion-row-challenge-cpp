@@ -7,12 +7,12 @@ Contains much more performant code to generate the input data.
 
 |Solution                                                                                                                                                                    |Average|Best   |Worst  |Cold   |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------|-------|-------|-------|
-|[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp)         |3.03s  |3.03s  |3.04s  |3.04s  |
-|[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp)|4.04s  |4.03s  |4.05s  |4.03s  |
-|[markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp)                                    |21.21s |21.16s |21.24s |21.24s |
-|[markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp)                           |27.28s |27.2s  |27.46s |27.2s  |
-|[naive_plus](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive_plus/naive_plus.cpp)                                                      |96.65s |95.13s |102.62s|102.62s|
-|[naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp)                                                                     |195.99s|194.37s|197.43s|194.37s|
+|[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp)         |3.03s  |3.02s  |3.04s  |3.03s  |
+|[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp)|4.03s  |4.02s  |4.04s  |4.04s  |
+|[markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp)                                    |22.18s |22.16s |22.21s |22.16s |
+|[markusaksli_default](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default/markusaksli_default.cpp)                           |28.66s |27.19s |31.42s |28.21s |
+|[naive_plus](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive_plus/naive_plus.cpp)                                                      |95.87s |94.57s |97.76s |94.57s |
+|[naive](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/naive/naive.cpp)                                                                     |209.66s|198.41s|233.22s|198.41s|
 
 ### Hardware
 - CPU: AMD Ryzen 9 7950X 16-Core Processor
@@ -88,8 +88,8 @@ Multithreaded version of [markusaksli_fast](https://github.com/markusaksli/billi
   - 17% in parsing and hashing station names
   - 8% in hashmap lookup
 - 1% spent merging results and sorting
-- 3036 ms over 15505.85 MB is 5107.32 MB/s, which is 71.69% of my benchmarked SSD sequential read speed
-- 3036ms at an average all-core clock rate of 5100 MHz is 15483600000 CPU cycles, which over 15505850382 bytes is 0.9986 CPU cycles/byte
+- 3030 ms over 16290.6 MB is 5376.4 MB/s, which is 75.5% of my benchmarked SSD sequential read speed
+- 3030 ms at an average all-core clock rate of 5100 MHz is 15483600000 CPU cycles, which over 16290602421 bytes is 0.95 CPU cycles/byte
 
 ### Potential unexplored optimizations
 - Running a search to make a perfect hash function (probably the biggest improvement?)

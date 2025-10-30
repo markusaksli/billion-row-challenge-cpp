@@ -17,9 +17,8 @@ $PROGRAMS = @(
     "solutions\markusaksli_default_threaded\x64\Release\markusaksli_default_threaded.exe",
     "solutions\markusaksli_fast\x64\Release\markusaksli_fast.exe",
     "solutions\markusaksli_default\x64\Release\markusaksli_default.exe"
-# These take waaaaaaaayyyyy too long for me to bother to run them again
-#    "solutions\naive_plus\x64\Release\naive_plus.exe",
-#    "solutions\naive\x64\Release\naive.exe"
+    "solutions\naive_plus\x64\Release\naive_plus.exe",
+    "solutions\naive\x64\Release\naive.exe"
 )
 
 function Test-Admin {

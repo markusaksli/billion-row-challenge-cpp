@@ -37,9 +37,9 @@ struct String
 		assert(!Empty());
 	}
 
-	bool Equals(const char* str, u64 len) const
+	bool Equals(const char* str, const u64 len) const
 	{
-		if (len != len
+		if (this->len != len
 			|| data[0] != str[0]
 			|| data[len - 1] != str[len - 1])
 		{
