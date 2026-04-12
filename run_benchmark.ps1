@@ -13,6 +13,7 @@ $OUTPUT_CSV = Join-Path $RootDir $OutputCsv
 
 # --- List of programs to benchmark ---
 $PROGRAMS = @(
+    "solutions\markusaksli_fast_threaded_jai\markusaksli_fast_threaded_jai.exe",
     "solutions\markusaksli_fast_threaded\x64\Release\markusaksli_fast_threaded.exe",
     "solutions\markusaksli_default_threaded\x64\Release\markusaksli_default_threaded.exe",
     "solutions\markusaksli_fast\x64\Release\markusaksli_fast.exe",

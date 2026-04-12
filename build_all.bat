@@ -46,6 +46,7 @@ msbuild "%SCRIPT_DIR%solutions\markusaksli_default\markusaksli_default.sln" /p:C
 msbuild "%SCRIPT_DIR%solutions\markusaksli_fast\markusaksli_fast.sln" /p:Configuration=Release
 msbuild "%SCRIPT_DIR%solutions\markusaksli_default_threaded\markusaksli_default_threaded.sln" /p:Configuration=Release
 msbuild "%SCRIPT_DIR%solutions\markusaksli_fast_threaded\markusaksli_fast_threaded.sln" /p:Configuration=Release
+jai "%SCRIPT_DIR%solutions\markusaksli_fast_threaded_jai\build.jai" -o
 
 endlocal
 pause
