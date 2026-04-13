@@ -7,6 +7,7 @@ Contains much more performant code to generate the input data.
 
 |Solution                                                                                                                                                                    |Average|Best   |Worst  |Cold   |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------|-------|-------|-------|
+|[markusaksli_fast_threaded_jai](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded_jai/main.jai)                      |3.03s  |3.02s  |3.03s  |3.03s  |
 |[markusaksli_fast_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast_threaded/markusaksli_fast_threaded.cpp)         |3.03s  |3.02s  |3.04s  |3.03s  |
 |[markusaksli_default_threaded](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_default_threaded/markusaksli_default_threaded.cpp)|4.03s  |4.02s  |4.04s  |4.04s  |
 |[markusaksli_fast](https://github.com/markusaksli/billion-row-challenge-cpp/blob/master/solutions/markusaksli_fast/markusaksli_fast.cpp)                                    |22.18s |22.16s |22.21s |22.16s |
